@@ -4,16 +4,19 @@ Movieverse is an interactive cinema atlas. Milestone 0 is a working map of 32 or
 
 ## Run locally
 
-Install Python 3.12+, Node.js 24+ and pnpm 11.25.0 (for example, `npm install -g pnpm@11.25.0`). From the repository root:
+Open the Movieverse repository folder in VS Code and open its integrated terminal. Install Node.js 24+ and pnpm 11.25.0 (for example, `npm install -g pnpm@11.25.0`), then run:
 
 ```sh
-python -m pipeline.src.catalog
 cd web
 pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Open the local URL Vite prints (normally http://localhost:5173). Regeneration is optional on a clean checkout because the generated sample is tracked.
+Open the local URL Vite prints (normally http://localhost:5173). Opening `web/index.html` directly or through a generic HTML preview bypasses the TypeScript build. Keep the Vite terminal running while you use the atlas.
+
+Install dependencies before inspecting TypeScript diagnostics. If VS Code still reports missing packages after installation, run **TypeScript: Restart TS Server** from the Command Palette. You can check the project directly with `pnpm typecheck` from `web`.
+
+The sample data is tracked, so Python is optional for using the app. To regenerate the sample, run `python -m pipeline.src.catalog` from the repository root with Python 3.12+.
 
 ## Verify
 

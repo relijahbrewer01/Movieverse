@@ -5,3 +5,4 @@
 - Use approved sources only. Preserve source IDs, rights, provenance, and uncertainty. Keep original fictional fixtures visibly marked. Never merge by title alone or commit credentials, private exports, or external dumps.
 - Keep catalog identity independent from projection geometry and personal overlays. Keep personal exports on the user's device if that feature is later implemented.
 - Regenerate the sample after data changes. Run the README checks and report actual results. Deployment and destructive operations require explicit approval.
+- Push verified changes to the active Movieverse GitHub branch or pull request so the owner can access and test them. Include the GitHub link when reporting changes.

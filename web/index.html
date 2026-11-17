@@ -8,7 +8,20 @@
     <title>Movieverse | Cinema atlas</title>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <div id="root">
+      <main style="max-width: 38rem; margin: 4rem auto; padding: 0 1rem; font: 1rem/1.5 system-ui, sans-serif">
+        <h1>Start Movieverse</h1>
+        <p>Movieverse runs through Vite. From the repository root, run these commands in a terminal:</p>
+        <pre style="overflow: auto">cd web
+pnpm install --frozen-lockfile
+pnpm dev</pre>
+        <p>Open the local URL printed in the terminal. Use Node.js 24 or newer and pnpm 11.25.0.</p>
+      </main>
+    </div>
+    <script type="module">
+      if (location.protocol !== 'file:') {
+        import('/src/main.tsx');
+      }
+    </script>
   </body>
 </html>

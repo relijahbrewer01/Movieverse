@@ -5,23 +5,29 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
-      - run: python -m unittest discover -s pipeline/tests -v
+      - name: Test data pipeline
+        working-directory: .
+        run: python -m unittest discover -s pipeline/tests -v
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
           package-manager-cache: false
       - run: npm install --global pnpm@11.25.0
-      - working-directory: web
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm lint
-          pnpm typecheck
-          pnpm test
-          pnpm build
-          pnpm exec playwright install --with-deps chromium
-          pnpm test:e2e
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - name: Test frontend logic
+        run: pnpm test
+      - run: pnpm build
+      - name: Install Chromium for browser tests
+        run: pnpm exec playwright install --with-deps --only-shell chromium
+      - name: Test desktop and touch in Chromium
+        run: pnpm test:e2e
