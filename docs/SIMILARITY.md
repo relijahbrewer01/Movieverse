@@ -1,0 +1,5 @@
+# Projection and similarity
+
+The demo is a deterministic placement exercise. Sort films by ID, choose their first genre's region center, and place them outward along a spiral with angle increment 2.3999632297 radians and radius 0.12 times the square root of the region index. Round coordinates to four decimals. Position within a region depends on ID order. The demo does not compute nearest neighbors or interpret screen distance as film similarity.
+
+For Milestone 1, measure field coverage and compare genre/subject/era/creator baselines on vetted examples. Normalize multivalued fields and account for evidence availability in each pair. Sparse records may warrant low confidence or exclusion from neighbor suggestions. Keep ranked neighbors and evidence separate from the 2D embedding. Record seed, transformations and feature weights; track duplicates, completeness, coverage, neighbor sanity, cluster stability, and performance across languages and distribution types. Review the impact of a new projection before activating it.
