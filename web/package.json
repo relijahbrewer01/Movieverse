@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:standalone": "node scripts/standalone.mjs",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",

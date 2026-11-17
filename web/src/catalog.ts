@@ -41,6 +41,8 @@ export function filterFilms(films: Film[], filters: Filters) {
 }
 
 async function getJson<T>(file: string, signal: AbortSignal): Promise<T> {
+  const embedded = document.getElementById('atlas-' + file)?.textContent;
+  if (embedded) return JSON.parse(embedded) as T;
   const response = await fetch(import.meta.env.BASE_URL + file, { signal });
   if (!response.ok) throw new Error('Atlas asset unavailable');
   return response.json();

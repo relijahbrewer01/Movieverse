@@ -16,6 +16,18 @@ test('opening the source HTML directly shows launch instructions', async ({ page
   await expect(page.getByText('pnpm dev', { exact: false })).toBeVisible();
 });
 
+test('the root HTML opens the interactive atlas from disk', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop', 'Verifies the local file entry point');
+  await page.route(/^https?:\/\//, route => route.abort());
+  await page.goto(new URL('../../../index.html', import.meta.url).href);
+  await expect(page.getByRole('heading', { name: 'Movieverse', exact: true })).toBeVisible();
+  await expect(page.getByLabel('Interactive map')).toBeVisible();
+  await expect(page.getByText('32 of 32')).toBeVisible();
+  await page.getByRole('searchbox', { name: 'Title or year' }).fill('Paper Sun 2022');
+  await page.getByRole('button', { name: 'Paper Sun, 2022, TV movie' }).click();
+  await expect(page.getByRole('region', { name: 'Paper Sun' })).toBeVisible();
+});
+
 test('search and filter, open accessible details, then restore focus', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByText('32 of 32')).toBeVisible();

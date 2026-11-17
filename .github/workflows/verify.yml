@@ -27,6 +27,8 @@ jobs:
       - name: Test frontend logic
         run: pnpm test
       - run: pnpm build
+      - name: Check the standalone preview is current
+        run: pnpm build:standalone --check
       - name: Install Chromium for browser tests
         run: pnpm exec playwright install --with-deps --only-shell chromium
       - name: Test desktop and touch in Chromium

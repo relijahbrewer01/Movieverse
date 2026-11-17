@@ -2,7 +2,13 @@
 
 Movieverse is an interactive cinema atlas. Milestone 0 is a working map of 32 original fictional films, including TV movies. Search by title or year, combine genre and format filters, then select a film on the map or in the accessible result list. Drag, pinch, scroll, or use the map buttons and arrow keys. Colors indicate primary genre. Positions are for navigation.
 
-## Run locally
+## Open in VS Code
+
+Open the local Movieverse checkout in VS Code. Right-click the [index.html at the repository root](index.html) and choose **Open in Integrated Browser**. It opens the interactive demo without a terminal, dependency install, or server.
+
+The root file is generated from the same React app and sample data. It reflects the latest checked-in build. Use the development server below for live edits. After changing the app or demo data, run `pnpm build:standalone` from `web/` to refresh the root file.
+
+## Develop locally
 
 Open the Movieverse repository folder in VS Code and open its integrated terminal. Install Node.js 24+ and pnpm 11.25.0 (for example, `npm install -g pnpm@11.25.0`), then run:
 
@@ -29,6 +35,7 @@ pnpm lint
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm build:standalone --check
 pnpm exec playwright install chromium
 pnpm test:e2e
 ```
