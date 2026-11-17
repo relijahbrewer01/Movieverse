@@ -1,6 +1,6 @@
 import { StrictMode, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { AtlasMap, regionColors } from './AtlasMap';
+import { AtlasMap, regionByName, regions } from './AtlasMap';
 import { filterFilms, loadAtlas } from './catalog';
 import type { Atlas, Filters, Point } from './catalog';
 import './style.css';
@@ -49,14 +49,17 @@ function Explorer({ atlas }: { atlas: Atlas }) {
 
   return (
     <main className="workspace">
-      <div className="map-area">
-        <AtlasMap points={atlas.points} films={films} visible={visible}
-          selected={selected?.id ?? null} focus={focus} onSelect={select} />
-        <section className="legend" aria-label="Map legend">
-          <span>Primary genre</span>
-          <ul>{Object.entries(regionColors).map(([name, color]) =>
-            <li key={name}><i aria-hidden="true" style={{ background: color }} />{name}</li>)}</ul>
-        </section>
+      <div className="map-stack">
+        <div className="map-area">
+          <AtlasMap points={atlas.points} films={films} visible={visible}
+            selected={selected?.id ?? null} focus={focus} onSelect={select} />
+          <section className="legend" aria-label="Map legend">
+            <span>Primary genre</span>
+            <ul>{regions.map(({ name, marker, color }) =>
+              <li key={name}><span className="marker" data-shape={marker} style={{ color }} aria-hidden="true" />{name}</li>)}</ul>
+          </section>
+        </div>
+        <p className="atlas-caption">Positions group films by primary genre. Distance does not measure film similarity.</p>
       </div>
 
       <aside className="sidebar" aria-label="Film explorer">
@@ -82,8 +85,10 @@ function Explorer({ atlas }: { atlas: Atlas }) {
             <span className="result-count" aria-live="polite">{matches.length} of {atlas.films.length}</span>
           </div>
           <label className="search-label" htmlFor="search">Title or year</label>
-          <input ref={search} id="search" type="search" placeholder="e.g. Paper Sun" value={filters.query}
-            onChange={event => updateFilter('query', event.target.value)} />
+          <div className="search-field">
+            <input ref={search} id="search" type="search" placeholder="e.g. Paper Sun" value={filters.query}
+              onChange={event => updateFilter('query', event.target.value)} />
+          </div>
           <div className="filters">
             <label>Genre<select value={filters.genre} onChange={event => updateFilter('genre', event.target.value)}>
               <option value="">All genres</option>
@@ -94,21 +99,23 @@ function Explorer({ atlas }: { atlas: Atlas }) {
             </select></label>
           </div>
           {matches.length ? <ul className="films" aria-label="Matching films">
-            {matches.map(film => <li key={film.id}>
-              <button type="button" aria-label={film.title + ', ' + (film.year ?? 'unknown year') + ', ' + film.format}
-                aria-pressed={film.id === selectedId} onClick={event => select(film.id, event.currentTarget, true)}>
-                <i aria-hidden="true" style={{ background: regionColors[points.get(film.id)?.region ?? ''] }} />
-                <span><strong>{film.title}</strong><small>{film.format}</small></span>
-                <span className="film-year">{film.year ?? 'Unknown'}</span>
-              </button>
-            </li>)}
+            {matches.map(film => {
+              const style = regionByName.get(points.get(film.id)?.region ?? '');
+              return <li key={film.id}>
+                <button type="button" aria-label={film.title + ', ' + (film.year ?? 'unknown year') + ', ' + film.format}
+                  aria-pressed={film.id === selectedId} onClick={event => select(film.id, event.currentTarget, true)}>
+                  <span className="marker" data-shape={style?.marker} style={{ color: style?.color }} aria-hidden="true" />
+                  <span><strong>{film.title}</strong><small>{film.format}</small></span>
+                  <span className="film-year">{film.year ?? 'Unknown'}</span>
+                </button>
+              </li>;
+            })}
           </ul> : <div className="empty">
             <p>No films match these filters.</p>
             <button type="button" onClick={() => { setFilters(initialFilters); search.current?.focus(); }}>Clear filters</button>
           </div>}
         </section>
       </aside>
-      <p className="atlas-caption">Positions group films by primary genre. Distance does not measure film similarity.</p>
       <span className="sr-only">{selected && region ? 'Selected map region: ' + region : ''}</span>
     </main>
   );
@@ -129,8 +136,8 @@ function App() {
   return (
     <div className="shell">
       <header className="masthead">
-        <div className="wordmark"><span className="orbit" aria-hidden="true">✦</span><h1>Movieverse</h1></div>
-        <p>Demo atlas <span>·</span> Fictional films</p>
+        <div className="wordmark"><span className="aperture" aria-hidden="true" /><h1>Movieverse</h1></div>
+        <p className="catalog-status">Demo atlas <span> / </span> Fictional films</p>
       </header>
       {atlas ? <Explorer atlas={atlas} /> : error ?
         <section className="status" role="alert"><p>The atlas couldn’t load.</p>

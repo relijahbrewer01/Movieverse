@@ -4,18 +4,16 @@ import { center, distance, home, midpoint, pan, project, zoom } from './camera';
 import type { Camera, Position, Size } from './camera';
 import type { Film, Point } from './catalog';
 
-export const regionColors: Record<string, string> = {
-  'Science fiction': '#80d8f2',
-  Drama: '#ffc08d',
-  Documentary: '#b9df95',
-  Animation: '#dbacff',
-};
-const regions = [
-  { name: 'Science fiction', x: -0.89, y: -0.72 },
-  { name: 'Drama', x: 0.58, y: -0.77 },
-  { name: 'Documentary', x: -0.58, y: 0.84 },
-  { name: 'Animation', x: 0.89, y: 0.81 },
-];
+export const regions = [
+  { name: 'Science fiction', color: '#9fd1dc', marker: 'diamond' },
+  { name: 'Drama', color: '#e7ac89', marker: 'circle' },
+  { name: 'Documentary', color: '#cfdb89', marker: 'square' },
+  { name: 'Animation', color: '#c4b5e6', marker: 'plus' },
+] as const;
+export const regionByName = new Map<string, typeof regions[number]>(
+  regions.map(region => [region.name, region]),
+);
+const mono = 'ui-monospace, Consolas, monospace';
 
 interface Props {
   points: Point[];
@@ -26,41 +24,117 @@ interface Props {
   onSelect: (id: string, source: HTMLElement, moveCamera: boolean) => void;
 }
 
+function drawGrid(ctx: CanvasRenderingContext2D, size: Size, camera: Camera) {
+  const origin = project({ x: 0, y: 0 }, camera, size);
+  const unit = project({ x: 1, y: 0 }, camera, size).x - origin.x;
+  const step = unit * 2 ** Math.ceil(Math.log2(33 / unit));
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = '#232920';
+  ctx.beginPath();
+  for (let x = origin.x % step; x < size.width; x += step) {
+    const column = Math.floor(x) + 0.5;
+    ctx.moveTo(column, 0);
+    ctx.lineTo(column, size.height);
+  }
+  for (let y = origin.y % step; y < size.height; y += step) {
+    const row = Math.floor(y) + 0.5;
+    ctx.moveTo(0, row);
+    ctx.lineTo(size.width, row);
+  }
+  ctx.stroke();
+  ctx.strokeStyle = '#3c4434';
+  ctx.setLineDash([2, 5]);
+  ctx.beginPath();
+  ctx.moveTo(origin.x, 0);
+  ctx.lineTo(origin.x, size.height);
+  ctx.moveTo(0, origin.y);
+  ctx.lineTo(size.width, origin.y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawMarker(
+  ctx: CanvasRenderingContext2D, { x, y }: Position,
+  marker: typeof regions[number]['marker'], radius: number,
+) {
+  switch (marker) {
+    case 'circle':
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    case 'diamond':
+      ctx.beginPath();
+      ctx.moveTo(x, y - radius - 1);
+      ctx.lineTo(x + radius + 1, y);
+      ctx.lineTo(x, y + radius + 1);
+      ctx.lineTo(x - radius - 1, y);
+      ctx.closePath();
+      ctx.fill();
+      break;
+    case 'square':
+      ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+      break;
+    case 'plus':
+      ctx.fillRect(x - radius - 1, y - 1, radius * 2 + 2, 2);
+      ctx.fillRect(x - 1, y - radius - 1, 2, radius * 2 + 2);
+      break;
+  }
+}
+
+function drawRegionLabels(ctx: CanvasRenderingContext2D, size: Size, camera: Camera, props: Props) {
+  const bounds = new Map<string, { left: number; right: number; top: number; bottom: number }>();
+  for (const point of props.points) {
+    if (!props.visible.has(point.id)) continue;
+    const { x, y } = project(point, camera, size);
+    const region = bounds.get(point.region);
+    if (region) {
+      region.left = Math.min(region.left, x);
+      region.right = Math.max(region.right, x);
+      region.top = Math.min(region.top, y);
+      region.bottom = Math.max(region.bottom, y);
+    } else {
+      bounds.set(point.region, { left: x, right: x, top: y, bottom: y });
+    }
+  }
+  ctx.font = '600 11px ' + mono;
+  ctx.textAlign = 'center';
+  for (const region of regions) {
+    const box = bounds.get(region.name);
+    if (!box) continue;
+    const x = (box.left + box.right) / 2;
+    const y = box.top >= 26 ? box.top - 12 : box.bottom + 21;
+    if (y < 14 || y > size.height - 8) continue;
+    const label = region.name.toUpperCase();
+    const width = ctx.measureText(label).width;
+    ctx.fillStyle = '#121610';
+    ctx.fillRect(x - width / 2 - 7, y - 13, width + 14, 19);
+    ctx.fillStyle = region.color;
+    ctx.fillText(label, x, y);
+  }
+}
+
 function paint(canvas: HTMLCanvasElement, size: Size, camera: Camera, props: Props) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
   ctx.setTransform(canvas.width / size.width, 0, 0, canvas.height / size.height, 0, 0);
   ctx.clearRect(0, 0, size.width, size.height);
+  drawGrid(ctx, size, camera);
 
-  if (camera.zoom <= 2.3) {
-    ctx.font = '600 11px system-ui';
-    ctx.textAlign = 'center';
-    for (const region of regions) {
-      const at = project(region, camera, size);
-      ctx.fillStyle = regionColors[region.name];
-      ctx.fillText(region.name.toUpperCase(), at.x, at.y);
-    }
-  }
+  if (camera.zoom <= 2.3) drawRegionLabels(ctx, size, camera, props);
 
   for (const point of props.points) {
     if (!props.visible.has(point.id)) continue;
     const at = project(point, camera, size);
     if (at.x < -20 || at.x > size.width + 20 || at.y < -20 || at.y > size.height + 20) continue;
     const active = point.id === props.selected;
-    const color = regionColors[point.region] ?? '#e1eafa';
-    ctx.beginPath();
-    ctx.arc(at.x, at.y, active ? 15 : 10, 0, Math.PI * 2);
-    ctx.fillStyle = color + '22';
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(at.x, at.y, active ? 5.5 : 3.5, 0, Math.PI * 2);
+    const region = regionByName.get(point.region);
+    const color = region?.color ?? '#e9ede4';
     ctx.fillStyle = active ? '#ffffff' : color;
-    ctx.fill();
+    drawMarker(ctx, at, region?.marker ?? 'circle', active ? 4.5 : 3);
     if (active) {
-      ctx.beginPath();
-      ctx.arc(at.x, at.y, 11, 0, Math.PI * 2);
       ctx.strokeStyle = color;
-      ctx.stroke();
+      ctx.strokeRect(at.x - 9, at.y - 9, 18, 18);
     }
   }
 
@@ -72,23 +146,23 @@ function paint(canvas: HTMLCanvasElement, size: Size, camera: Camera, props: Pro
     const at = project(point, camera, size);
     const label = props.films.get(point.id)?.title;
     if (!label || at.x < 0 || at.y < 14 || at.y > size.height - 8) continue;
-    ctx.font = '600 12px system-ui';
+    ctx.font = '600 11px ' + mono;
     ctx.textAlign = 'left';
     const width = ctx.measureText(label).width;
     const x = Math.min(at.x + 13, size.width - width - 6);
     if (x < 0 || at.x > size.width || occupied.some(box =>
       Math.abs(box.y - at.y) < 17 && box.x < x + width + 5 && x < box.x + box.width + 5)) continue;
     occupied.push({ x, y: at.y, width });
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = '#0b101a';
-    ctx.strokeText(label, x, at.y + 4);
-    ctx.fillStyle = '#f2f5ff';
+    ctx.fillStyle = '#121610';
+    ctx.fillRect(x - 3, at.y - 8, width + 6, 16);
+    ctx.fillStyle = '#e9ede4';
     ctx.fillText(label, x, at.y + 4);
   }
 }
 
 export function AtlasMap(props: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const scaleRef = useRef<HTMLSpanElement>(null);
   const current = useRef(props);
   const size = useRef<Size>({ width: 1, height: 1 });
   const camera = useRef<Camera>(home);
@@ -102,6 +176,10 @@ export function AtlasMap(props: Props) {
     frame.current = requestAnimationFrame(() => {
       frame.current = 0;
       if (canvasRef.current) paint(canvasRef.current, size.current, camera.current, current.current);
+      const scale = Math.round(camera.current.zoom * 100) + '%';
+      if (scaleRef.current && scaleRef.current.textContent !== scale) {
+        scaleRef.current.textContent = scale;
+      }
     });
   }
 
@@ -245,21 +323,27 @@ export function AtlasMap(props: Props) {
   }
 
   return (
-    <section className="atlas-map" aria-label="Movie map">
-      <canvas ref={canvasRef} tabIndex={0} aria-label="Interactive map" aria-describedby="map-help"
-        onKeyDown={handleKey} onPointerDown={pointerDown} onPointerMove={pointerMove}
-        onPointerUp={event => pointerEnd(event, true)} onPointerCancel={event => pointerEnd(event, false)}
-        onLostPointerCapture={event => pointerEnd(event, false)} />
+    <section className="atlas-map" aria-labelledby="map-title">
+      <div className="map-bar">
+        <h2 id="map-title">Genre map</h2>
+        <div className="map-controls" role="group" aria-label="Map controls">
+          <span className="map-scale"><span className="sr-only">Zoom: </span><span ref={scaleRef}>100%</span></span>
+          <button type="button" aria-label="Zoom out" onClick={() => zoomBy(0.8)}>−</button>
+          <button type="button" aria-label="Zoom in" onClick={() => zoomBy(1.25)}>+</button>
+          <button type="button" className="map-reset" aria-label="Reset map view" onClick={() => setCamera(home)}>Reset</button>
+        </div>
+      </div>
+      <div className="map-field">
+        <canvas ref={canvasRef} tabIndex={0} aria-label="Interactive map" aria-describedby="map-help"
+          onKeyDown={handleKey} onPointerDown={pointerDown} onPointerMove={pointerMove}
+          onPointerUp={event => pointerEnd(event, true)} onPointerCancel={event => pointerEnd(event, false)}
+          onLostPointerCapture={event => pointerEnd(event, false)} />
+      </div>
       <p className="map-help" id="map-help">
-        <span className="touch-help">Drag or pinch to explore.</span>
-        <span className="desktop-help">Drag or use arrow keys to pan. Scroll or press +/− to zoom.</span>
+        <span className="touch-help">Drag to pan · Pinch to zoom</span>
+        <span className="desktop-help">Drag or use arrow keys to pan · Scroll or press +/− to zoom</span>
         <span className="sr-only"> Use the film list to select a movie with a keyboard.</span>
       </p>
-      <div className="map-controls" role="group" aria-label="Map controls">
-        <button type="button" aria-label="Zoom in" onClick={() => zoomBy(1.25)}>+</button>
-        <button type="button" aria-label="Zoom out" onClick={() => zoomBy(0.8)}>−</button>
-        <button type="button" aria-label="Reset map view" onClick={() => setCamera(home)}>⌂</button>
-      </div>
     </section>
   );
 }
