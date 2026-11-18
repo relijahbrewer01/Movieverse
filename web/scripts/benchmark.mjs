@@ -1,4 +1,4 @@
-/* global requestAnimationFrame, cancelAnimationFrame */
+/* global HTMLCanvasElement, requestAnimationFrame, cancelAnimationFrame */
 import { Buffer } from 'node:buffer';
 import console from 'node:console';
 import { readFile } from 'node:fs/promises';
@@ -96,7 +96,7 @@ async function measurePan(page, client, touch) {
   return percentile(intervals, 0.95);
 }
 
-async function measure(browser, url, profile, rawAssets, isStress) {
+async function measure(browser, url, profile, rawAssets, isStress, disableCanvas = false) {
   const { count } = JSON.parse(rawAssets[0]);
   const context = await browser.newContext(profile.options);
   try {
@@ -106,6 +106,14 @@ async function measure(browser, url, profile, rawAssets, isStress) {
       )));
     }
     const page = await context.newPage();
+    if (disableCanvas) {
+      await page.addInitScript(() => {
+        const original = HTMLCanvasElement.prototype.getContext;
+        HTMLCanvasElement.prototype.getContext = function (type, ...options) {
+          return type === '2d' ? null : original.call(this, type, ...options);
+        };
+      });
+    }
     const client = await context.newCDPSession(page);
     await client.send('Emulation.setCPUThrottlingRate', { rate: profile.cpu });
     const start = performance.now();
@@ -113,19 +121,23 @@ async function measure(browser, url, profile, rawAssets, isStress) {
     await page.getByText(count + ' of ' + count, { exact: true }).waitFor();
     await afterPaint(page);
     const ready = performance.now() - start;
+    const rows = await page.getByRole('list', { name: 'Matching films' }).getByRole('listitem').count();
     const pan = await measurePan(page, client, profile.touch);
     const filterStart = performance.now();
     await page.getByRole('searchbox', { name: 'Title or year' }).fill('Solaris 1972');
     await page.getByRole('button', { name: /^Solaris.*1972, Film$/ }).first().waitFor();
     await afterPaint(page);
-    return { ready, pan, search: performance.now() - filterStart };
+    return { ready, pan, search: performance.now() - filterStart, rows };
   } finally {
     await context.close();
   }
 }
 
-const cases = [{ name: 'Published pilot', data: raw }];
-if (!argv.includes('--actual-only')) cases.push({ name: 'Synthetic 5,000', data: stressRelease(5000) });
+const diagnostics = argv.includes('--diagnostics');
+const stress = argv.includes('--actual-only') && !diagnostics ? null : stressRelease(5000);
+const cases = diagnostics
+  ? [{ name: 'Synthetic 5,000', data: stress }, { name: 'Synthetic 5,000, canvas bypassed', data: stress, disableCanvas: true }]
+  : [{ name: 'Published pilot', data: raw }, ...(stress ? [{ name: 'Synthetic 5,000', data: stress }] : [])];
 const server = await preview({ preview: { host: '127.0.0.1', port: 0 } });
 let browser;
 try {
@@ -134,16 +146,17 @@ try {
   console.log(`Node ${version}, Chromium ${browser.version()}, ${platform}; medians of ${repetitions} runs`);
   const report = [];
   for (const scenario of cases) {
-    for (const profile of profiles) {
+    for (const profile of diagnostics ? profiles.filter(profile => profile.touch) : profiles) {
       const results = [];
       for (let run = 0; run < repetitions; run++) {
-        results.push(await measure(browser, url, profile, scenario.data, scenario.data !== raw));
+        results.push(await measure(browser, url, profile, scenario.data, scenario.data !== raw, scenario.disableCanvas));
       }
       const metric = key => Number(percentile(results.map(result => result[key]), 0.5).toFixed(1));
       report.push({
         catalog: scenario.name, profile: profile.name, films: JSON.parse(scenario.data[0]).count,
         'data KiB': Math.round(scenario.data.reduce((sum, asset) => sum + Buffer.byteLength(asset), 0) / 1024),
         'ready ms': metric('ready'), 'search ms': metric('search'), 'pan p95 ms': metric('pan'),
+        'mounted rows': metric('rows'),
       });
     }
   }
