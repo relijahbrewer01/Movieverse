@@ -217,6 +217,7 @@ input::placeholder { color: #929d8d; }
   pointer-events: none;
 }
 .filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
+.filter-wide { grid-column: 1 / -1; }
 .films {
   margin: 14px -3px -3px;
   padding: 3px;

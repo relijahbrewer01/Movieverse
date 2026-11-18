@@ -22,7 +22,7 @@ test('the root HTML opens the interactive atlas from disk', async ({ page }, inf
   await page.goto(new URL('../../../index.html', import.meta.url).href);
   await expect(page.getByRole('heading', { name: 'Movieverse', exact: true })).toBeVisible();
   await expect(page.getByLabel('Interactive map')).toBeVisible();
-  await expect(page.getByText('71 of 71')).toBeVisible();
+  await expect(page.getByText(/^(\d+) of \1$/)).toBeVisible();
   await page.getByRole('searchbox', { name: 'Title or year' }).fill('七人の侍 1954');
   await page.getByRole('button', { name: 'Seven Samurai, 1954, Film' }).click();
   const details = page.getByRole('region', { name: 'Seven Samurai' });
@@ -31,16 +31,16 @@ test('the root HTML opens the interactive atlas from disk', async ({ page }, inf
 
 test('search and filter, open accessible details, then restore focus', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByText('71 of 71')).toBeVisible();
+  await expect(page.getByText(/^(\d+) of \1$/)).toBeVisible();
   const search = page.getByRole('searchbox', { name: 'Title or year' });
   await search.fill('Solaris');
-  await expect(page.getByText('2 of 71')).toBeVisible();
+  await expect(page.getByText(/^2 of \d+$/)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Solaris, 1972, Film' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Solaris, 2002, Film' })).toBeVisible();
   await search.fill('Threads');
   await page.getByRole('combobox', { name: 'Format' }).selectOption('TV movie');
   await page.getByRole('combobox', { name: 'Genre' }).selectOption('Drama');
-  await expect(page.getByText('1 of 71')).toBeVisible();
+  await expect(page.getByText(/^1 of \d+$/)).toBeVisible();
   const result = page.getByRole('button', { name: 'Threads, 1984, TV movie' });
   await result.press('Enter');
   const details = page.getByRole('region', { name: 'Threads' });
@@ -51,7 +51,33 @@ test('search and filter, open accessible details, then restore focus', async ({ 
   await expect(result).toBeFocused();
   await search.fill('missing movie');
   await page.getByRole('button', { name: 'Clear filters' }).click();
-  await expect(page.getByText('71 of 71')).toBeVisible();
+  await expect(page.getByText(/^(\d+) of \1$/)).toBeVisible();
+});
+
+test('filter the expanded catalog by country of origin and title', async ({ page }) => {
+  await page.goto('/');
+  const country = page.getByRole('combobox', { name: 'Country of origin' });
+  const search = page.getByRole('searchbox', { name: 'Title or year' });
+  await country.selectOption('Senegal');
+  await search.fill('Touki Bouki');
+  await expect(page.getByRole('button', { name: 'Touki Bouki, 1973, Film' })).toBeVisible();
+  await country.selectOption('India');
+  await expect(page.getByText('No films match these filters.')).toBeVisible();
+  await search.fill('Pather Panchali');
+  await expect(page.getByRole('button', { name: 'Pather Panchali, 1955, Film' })).toBeVisible();
+});
+
+test('browse a reviewed TV movie with additional publication years', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop', 'Checks evidence shared by both viewports');
+  await page.goto('/');
+  await page.getByRole('searchbox', { name: 'Title or year' }).fill('Duel');
+  await page.getByRole('combobox', { name: 'Genre' }).selectOption('Thriller');
+  await page.getByRole('combobox', { name: 'Format' }).selectOption('TV movie');
+  await page.getByRole('button', { name: 'Duel, 1971, TV movie' }).click();
+  const details = page.getByRole('region', { name: 'Duel' });
+  await expect(details.getByText('1972, 1973, 1974')).toBeVisible();
+  await expect(details.getByRole('link', { name: 'Amblin production history' }))
+    .toHaveAttribute('href', 'https://amblin.com/movie/duel/');
 });
 
 test('select a rendered point, navigate with buttons and keyboard', async ({ page }) => {

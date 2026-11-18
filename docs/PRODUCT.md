@@ -4,7 +4,7 @@ Movieverse is a free atlas for discovering cinema through an explorable landscap
 
 Milestone 0 ships an anonymous static prototype with touch and keyboard navigation, genre and format filters, title/year search, point selection, a responsive details card, and an accessible film list. A mobile in-flow card keeps the map mounted. Draggable sheets, related-film suggestions, deeper filters, and live film facts await later iterations.
 
-1. Audit and grow a real film catalog with credible provenance, identity resolution, and measured map quality.
+1. Audit and grow a real film catalog with credible provenance, identity resolution, and measured map quality. The current pilot has 135 films. Move import and review records into a build-time database before expanding much further, then benchmark map placement and mobile browsing. The brief's 10k–50k range depends on source coverage, quality, and performance.
 2. Add browser-only personal constellations from user-authorized Letterboxd exports after verifying actual files.
 3. Validate multiple similarity lenses and interpretable film connections.
 4. Expand catalog and rendering capacity only when rights, quality, and benchmarks support it.

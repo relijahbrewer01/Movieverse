@@ -12,6 +12,7 @@ from urllib.request import Request, urlopen
 from .catalog import ROOT, encode
 
 EVIDENCE = ROOT / "data/wikidata-pilot/snapshot.json"
+EXPANSION = ROOT / "data/wikidata-pilot/expansion.json"
 SEEDS = ROOT / "pipeline/fixtures/wikidata-candidates.txt"
 PROPERTIES = ("P31", "P136", "P1476", "P495", "P577")
 USER_AGENT = "MovieversePilot/0.1 (https://github.com/relijahbrewer01/Movieverse)"
@@ -66,9 +67,9 @@ def evidence(item: dict) -> dict:
             "aliases": aliases, "claims": fields}
 
 
-def snapshot() -> dict:
+def snapshot(seed_file: Path = SEEDS) -> dict:
     seeds = []
-    for line in SEEDS.read_text(encoding="utf-8-sig").splitlines():
+    for line in seed_file.read_text(encoding="utf-8-sig").splitlines():
         title, year, *tags = line.split("|")
         seeds.append({"seed": title, "expected_year": int(year), "tv_candidate": "tv" in tags})
     by_title = {}
@@ -113,14 +114,35 @@ def snapshot() -> dict:
     }
 
 
+def load_snapshots(paths: list[Path]) -> dict:
+    """Combine pinned batches in order, preserving the first evidence for each QID."""
+    batches = [(path.stem, json.loads(path.read_text(encoding="utf-8"))) for path in paths]
+    rights = {batch["rights"] for _, batch in batches}
+    if rights != {"CC0-1.0"}:
+        raise ValueError("Movieverse pilot expects CC0 Wikidata evidence")
+    combined = {
+        "retrieved": max(batch["retrieved"] for _, batch in batches),
+        "rights": "CC0-1.0", "terms": {}, "entities": {}, "candidates": [],
+    }
+    for cohort, batch in batches:
+        for qid, term in batch["terms"].items():
+            combined["terms"].setdefault(qid, term)
+        for qid, entity in batch["entities"].items():
+            combined["entities"].setdefault(qid, {**entity, "retrieved": batch["retrieved"]})
+        combined["candidates"].extend({**row, "cohort": cohort} for row in batch["candidates"])
+    return combined
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--refresh", action="store_true", help="Refresh candidate evidence from Wikimedia")
+    parser.add_argument("--seeds", type=Path, default=SEEDS)
+    parser.add_argument("--output", type=Path, default=EVIDENCE)
     args = parser.parse_args()
     if args.refresh:
-        data = snapshot()
-        EVIDENCE.parent.mkdir(parents=True, exist_ok=True)
-        EVIDENCE.write_bytes(encode(data))
+        data = snapshot(args.seeds)
+        args.output.parent.mkdir(parents=True, exist_ok=True)
+        args.output.write_bytes(encode(data))
         print(f"Fetched {len(data['entities'])} entities for {len(data['candidates'])} candidates")
     else:
         parser.error("Use --refresh to capture evidence")

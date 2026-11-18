@@ -5,7 +5,7 @@ import { filterFilms, loadAtlas, unmappedGenre } from './catalog';
 import type { Atlas, Filters, Point } from './catalog';
 import './style.css';
 
-const initialFilters = { query: '', genre: '', format: '' };
+const initialFilters = { query: '', genre: '', format: '', country: '' };
 
 function Explorer({ atlas }: { atlas: Atlas }) {
   const [filters, setFilters] = useState<Filters>(initialFilters);
@@ -19,6 +19,8 @@ function Explorer({ atlas }: { atlas: Atlas }) {
   const genres = useMemo(() => [...new Set(atlas.films.flatMap(film =>
     film.genres.length ? film.genres : [unmappedGenre]))].sort(), [atlas]);
   const formats = useMemo(() => [...new Set(atlas.films.map(film => film.format))].sort(), [atlas]);
+  const countries = useMemo(() => [...new Set(atlas.films.flatMap(film => film.countries ?? []))]
+    .sort((a, b) => a.localeCompare(b)), [atlas]);
   const mapGroups = useMemo(() => new Set(atlas.points.map(point => point.region)), [atlas]);
   const matches = useMemo(() => filterFilms(atlas.films, filters), [atlas, filters]);
   const visible = useMemo(() => new Set(matches.map(film => film.id)), [matches]);
@@ -27,6 +29,7 @@ function Explorer({ atlas }: { atlas: Atlas }) {
   const region = selectedPoint?.region ?? '';
   const qid = selected?.provenance.qid;
   const sourceUrl = qid && /^Q\d+$/.test(qid) ? `https://www.wikidata.org/wiki/${qid}` : null;
+  const otherYears = selected?.publication_years?.filter(year => year !== selected.year) ?? [];
 
   function select(id: string, source: HTMLElement, moveCamera: boolean) {
     trigger.current = source;
@@ -86,8 +89,16 @@ function Explorer({ atlas }: { atlas: Atlas }) {
               {' · ' + selected.provenance.rights}</dd></div>
             {selected.countries && selected.countries.length > 0 &&
               <div><dt>Country of origin</dt><dd>{selected.countries.join(', ')}</dd></div>}
+            {otherYears.length > 0 &&
+              <div><dt>Other Wikidata publication years</dt><dd>{otherYears.join(', ')}</dd></div>}
             {selected.aliases && selected.aliases.length > 0 &&
               <div className="detail-wide"><dt>Also listed as</dt><dd>{selected.aliases.join(' · ')}</dd></div>}
+            {selected.format_review && <div className="detail-wide">
+              <dt>Format evidence</dt>
+              <dd>{selected.format_review.note}{' '}
+                <a href={selected.format_review.url} target="_blank" rel="noreferrer">{selected.format_review.label}</a>
+              </dd>
+            </div>}
           </dl>
         </section>}
         <section className="search-panel" aria-labelledby="explore">
@@ -110,6 +121,12 @@ function Explorer({ atlas }: { atlas: Atlas }) {
               <option value="">All formats</option>
               {formats.map(format => <option key={format}>{format}</option>)}
             </select></label>
+            {countries.length > 0 && <label className="filter-wide">Country of origin
+              <select value={filters.country} onChange={event => updateFilter('country', event.target.value)}>
+                <option value="">All countries</option>
+                {countries.map(country => <option key={country}>{country}</option>)}
+              </select>
+            </label>}
           </div>
           {matches.length ? <ul className="films" aria-label="Matching films">
             {matches.map(film => {

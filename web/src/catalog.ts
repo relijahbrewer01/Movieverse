@@ -6,6 +6,8 @@ export interface Film {
   format: 'Feature' | 'Film' | 'TV movie';
   aliases?: string[];
   countries?: string[];
+  publication_years?: number[];
+  format_review?: { label: string; url: string; reviewed: string; note: string };
   provenance: { source: string; status: string; rights: string; qid?: string; revision?: string; retrieved?: string };
 }
 
@@ -27,6 +29,7 @@ export interface Filters {
   query: string;
   genre: string;
   format: string;
+  country?: string;
 }
 
 export const unmappedGenre = 'Unmapped';
@@ -42,6 +45,7 @@ export function filterFilms(films: Film[], filters: Filters) {
     const matchesGenre = film.genres.length ? film.genres.includes(filters.genre) : filters.genre === unmappedGenre;
     return (!filters.genre || matchesGenre) &&
       (!filters.format || film.format === filters.format) &&
+      (!filters.country || film.countries?.includes(filters.country)) &&
       words.every(word => searchable.includes(word));
   });
 }

@@ -16,8 +16,16 @@ REGIONS = {
     "Documentary": (-0.51, 0.54),
     "Animation": (0.89, 0.46),
     "Unmapped": (0, 0),
+    "Other": (0, 0),
 }
 PROVENANCE = {"source": "movieverse-fixtures", "status": "fictional", "rights": "CC0-1.0"}
+
+
+class FormatReview(TypedDict):
+    label: str
+    url: str
+    reviewed: str
+    note: str
 
 
 class Film(TypedDict):
@@ -29,6 +37,8 @@ class Film(TypedDict):
     provenance: dict[str, str]
     aliases: NotRequired[list[str]]
     countries: NotRequired[list[str]]
+    publication_years: NotRequired[list[int]]
+    format_review: NotRequired[FormatReview]
 
 
 class CatalogSource(Protocol):
@@ -73,16 +83,23 @@ class DemoProjection:
     id = "genre-regions-v1"
     spacing = 0.12
 
+    def region(self, film: Film) -> str:
+        return film["genres"][0] if film["genres"] else "Unmapped"
+
+    def spacing_for(self, count: int) -> float:
+        return self.spacing
+
     def points(self, films: list[Film]) -> list[dict]:
+        groups = [(film, self.region(film)) for film in films]
+        totals = Counter(region for _, region in groups)
         counts: Counter[str] = Counter()
         points = []
-        for film in films:
-            region = film["genres"][0] if film["genres"] else "Unmapped"
+        for film, region in groups:
             index = counts[region]
             counts[region] += 1
             center_x, center_y = REGIONS[region]
             angle = index * 2.3999632297
-            radius = self.spacing * math.sqrt(index)
+            radius = self.spacing_for(totals[region]) * math.sqrt(index)
             points.append({
                 "id": film["id"], "region": region,
                 "x": round(center_x + math.cos(angle) * radius, 4),

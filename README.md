@@ -1,6 +1,6 @@
 # Movieverse
 
-Movieverse is an interactive cinema atlas. The first real-data pilot includes 71 films drawn from Wikidata. Search by title, alternate title, or year, combine genre and format filters, and select a film to see its metadata and source. The map shows editorial genre groups. See the [pilot audit](docs/WIKIDATA_PILOT.md) for coverage and limitations.
+Movieverse is an interactive cinema atlas. The Wikidata pilot includes 135 films. Search by title, alternate title, or year, combine country, genre, and format filters, and select a film to see its metadata and source. The map shows editorial genre groups. See the [pilot audit](docs/WIKIDATA_PILOT.md) for coverage and limitations.
 
 ## Open in VS Code
 
