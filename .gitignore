@@ -5,6 +5,7 @@ __pycache__/
 .env*
 data/raw/
 data/demo/
+data/build/
 data/private/
 playwright-report/
 test-results/

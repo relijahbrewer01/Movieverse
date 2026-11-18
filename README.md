@@ -22,7 +22,7 @@ Open the local URL Vite prints (normally http://localhost:5173). Opening `web/in
 
 Install dependencies before inspecting TypeScript diagnostics. If VS Code still reports missing packages after installation, run **TypeScript: Restart TS Server** from the Command Palette. You can check the project directly with `pnpm typecheck` from `web`.
 
-The sample data is tracked, so Python is optional for using the app. To regenerate it from pinned evidence, run `python -m pipeline.src.pilot` from the repository root with Python 3.12+. See the [data README](data/README.md) for refreshing the evidence and generating the original fixture catalog.
+The sample data is tracked, so Python is optional for using the app. Run `python -m pipeline.src.pilot` from the repository root with Python 3.12+ to build a local SQLite database from pinned evidence and export the static atlas. See the [data README](data/README.md) for inspecting the database, refreshing the evidence, and generating the original fixture catalog.
 
 ## Verify
 

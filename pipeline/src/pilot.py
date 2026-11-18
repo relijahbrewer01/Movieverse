@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .catalog import ROOT, DemoProjection, Film, FormatReview, encode, release
+from .catalog_db import DATABASE, open_catalog, rebuild_database
 from .wikidata import EVIDENCE, EXPANSION, load_snapshots
 
 DATASET = "wikidata-pilot"
@@ -184,15 +185,27 @@ def main() -> None:
                         help="Pinned evidence file. Repeat to compose batches in priority order.")
     parser.add_argument("--output", type=Path, default=ROOT / "data/sample")
     parser.add_argument("--report", type=Path, default=REPORT)
-    parser.add_argument("--format-reviews", type=Path, default=FORMAT_REVIEWS)
+    parser.add_argument("--format-reviews", type=Path)
+    parser.add_argument("--database", type=Path, default=DATABASE)
+    parser.add_argument("--from-database", action="store_true",
+                        help="Export an existing database without re-reading pinned inputs.")
     args = parser.parse_args()
-    pilot = audit(load_snapshots(args.snapshot or [EVIDENCE, EXPANSION]),
-                  json.loads(args.format_reviews.read_text(encoding="utf-8")))
-    manifest = release(pilot, PilotProjection(), args.output, dataset=DATASET)
+    if args.from_database:
+        if args.snapshot or args.format_reviews:
+            parser.error("--from-database cannot be combined with import inputs")
+    else:
+        snapshot = load_snapshots(args.snapshot or [EVIDENCE, EXPANSION])
+        reviews = json.loads((args.format_reviews or FORMAT_REVIEWS).read_text(encoding="utf-8"))
+        pilot = audit(snapshot, reviews)
+        rebuild_database(args.database, snapshot, pilot.records, pilot.report)
+
+    with open_catalog(args.database) as catalog:
+        manifest = release(catalog, PilotProjection(), args.output, dataset=DATASET)
+        report = catalog.audit_report()
     args.report.parent.mkdir(parents=True, exist_ok=True)
-    args.report.write_bytes(encode(pilot.report))
-    print(f"Published {manifest['count']} titles from {pilot.report['candidates']} candidates")
-    print(json.dumps(pilot.report["flags"], sort_keys=True))
+    args.report.write_bytes(encode(report))
+    print(f"Exported {manifest['count']} titles from {report['candidates']} candidates via {args.database}")
+    print(json.dumps(report["flags"], sort_keys=True))
 
 
 if __name__ == "__main__":

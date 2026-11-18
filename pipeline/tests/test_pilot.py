@@ -1,10 +1,12 @@
 import copy
 import json
+import sqlite3
 import tempfile
 import unittest
 from pathlib import Path
 
 from pipeline.src.catalog import ROOT, encode, release
+from pipeline.src.catalog_db import open_catalog, rebuild_database
 from pipeline.src.pilot import DATASET, FORMAT_REVIEWS, REPORT, PilotProjection, audit
 from pipeline.src.wikidata import EVIDENCE, EXPANSION, load_snapshots
 
@@ -21,13 +23,41 @@ class PilotTests(unittest.TestCase):
         self.assertEqual(self.pilot.report["cohorts"]["snapshot"], {"included": 71, "held": 1})
         self.assertEqual(self.pilot.report["cohorts"]["expansion"], {"included": 64, "held": 1})
         self.assertEqual(len(self.pilot.records), len({film["id"] for film in self.pilot.records}))
-        self.assertEqual(encode(self.pilot.report).decode(), REPORT.read_text(encoding="utf-8"))
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory)
-            manifest = release(self.pilot, PilotProjection(), output, dataset=DATASET)
+            database = output / "movieverse.sqlite3"
+            rebuild_database(database, self.snapshot, self.pilot.records, self.pilot.report)
+            with open_catalog(database) as catalog:
+                report = catalog.audit_report()
+                manifest = release(catalog, PilotProjection(), output, dataset=DATASET)
+                comparison = catalog.db.execute("""
+                    SELECT source_claims.value_json, source_claims.qualifiers_json
+                    FROM source_claims JOIN candidate_reviews USING (qid)
+                    WHERE source_claims.qid = 'Q583407' AND property = 'P577'
+                      AND statement_id IN (
+                          SELECT value FROM json_each(detail_json, '$.selected_year_statements')
+                      )
+                """).fetchone()
+                self.assertTrue(json.loads(comparison[0])["time"].startswith("+1971-"))
+                self.assertIn("P3301", json.loads(comparison[1]))
+                self.assertEqual(catalog.db.execute("PRAGMA integrity_check").fetchone(), ("ok",))
+                self.assertEqual(catalog.db.execute("PRAGMA foreign_key_check").fetchall(), [])
+            self.assertEqual(encode(report).decode(), REPORT.read_text(encoding="utf-8"))
             for name in (manifest["catalog"], manifest["geometry"], "manifest.v1.json"):
                 self.assertEqual((output / name).read_text(encoding="utf-8"),
                                  (ROOT / "data/sample" / name).read_text(encoding="utf-8"))
+
+    def test_failed_import_does_not_replace_an_existing_database(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = Path(directory) / "movieverse.sqlite3"
+            rebuild_database(database, self.snapshot, self.pilot.records, self.pilot.report)
+            original = database.read_bytes()
+            repeated = {**self.pilot.records[0], "id": "another-id-for-the-same-qid"}
+            with self.assertRaises(sqlite3.IntegrityError):
+                rebuild_database(database, self.snapshot, [*self.pilot.records, repeated],
+                                 self.pilot.report)
+            self.assertEqual(database.read_bytes(), original)
+            self.assertEqual(list(database.parent.iterdir()), [database])
 
     def test_same_name_films_are_distinct_and_out_of_scope_titles_are_held(self):
         solaris = [film for film in self.pilot.records if film["title"] == "Solaris"]

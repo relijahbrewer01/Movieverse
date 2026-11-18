@@ -16,6 +16,11 @@ jobs:
       - name: Test data pipeline
         working-directory: .
         run: python -m unittest discover -s pipeline/tests -v
+      - name: Rebuild and verify the SQLite export
+        working-directory: .
+        run: |
+          python -m pipeline.src.pilot
+          git diff --exit-code -- data/sample data/wikidata-pilot/audit.json
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
