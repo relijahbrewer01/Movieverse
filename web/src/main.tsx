@@ -27,6 +27,7 @@ function Explorer({ atlas }: { atlas: Atlas }) {
   const region = selectedPoint?.region ?? '';
   const qid = selected?.provenance.qid;
   const sourceUrl = qid && /^Q\d+$/.test(qid) ? `https://www.wikidata.org/wiki/${qid}` : null;
+  const otherYears = selected?.publication_years?.filter(year => year !== selected.year) ?? [];
 
   function select(id: string, source: HTMLElement, moveCamera: boolean) {
     trigger.current = source;
@@ -86,8 +87,16 @@ function Explorer({ atlas }: { atlas: Atlas }) {
               {' · ' + selected.provenance.rights}</dd></div>
             {selected.countries && selected.countries.length > 0 &&
               <div><dt>Country of origin</dt><dd>{selected.countries.join(', ')}</dd></div>}
+            {otherYears.length > 0 &&
+              <div><dt>Other Wikidata publication years</dt><dd>{otherYears.join(', ')}</dd></div>}
             {selected.aliases && selected.aliases.length > 0 &&
               <div className="detail-wide"><dt>Also listed as</dt><dd>{selected.aliases.join(' · ')}</dd></div>}
+            {selected.format_review && <div className="detail-wide">
+              <dt>Format evidence</dt>
+              <dd>{selected.format_review.note}{' '}
+                <a href={selected.format_review.url} target="_blank" rel="noreferrer">{selected.format_review.label}</a>
+              </dd>
+            </div>}
           </dl>
         </section>}
         <section className="search-panel" aria-labelledby="explore">

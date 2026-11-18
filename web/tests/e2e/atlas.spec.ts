@@ -54,6 +54,19 @@ test('search and filter, open accessible details, then restore focus', async ({ 
   await expect(page.getByText('71 of 71')).toBeVisible();
 });
 
+test('browse a reviewed TV movie with additional publication years', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop', 'Checks evidence shared by both viewports');
+  await page.goto('/');
+  await page.getByRole('searchbox', { name: 'Title or year' }).fill('Duel');
+  await page.getByRole('combobox', { name: 'Genre' }).selectOption('Thriller');
+  await page.getByRole('combobox', { name: 'Format' }).selectOption('TV movie');
+  await page.getByRole('button', { name: 'Duel, 1971, TV movie' }).click();
+  const details = page.getByRole('region', { name: 'Duel' });
+  await expect(details.getByText('1972, 1973, 1974')).toBeVisible();
+  await expect(details.getByRole('link', { name: 'Amblin production history' }))
+    .toHaveAttribute('href', 'https://amblin.com/movie/duel/');
+});
+
 test('select a rendered point, navigate with buttons and keyboard', async ({ page }) => {
   await page.goto('/');
   const response = await page.request.get('/geometry.v1.json');

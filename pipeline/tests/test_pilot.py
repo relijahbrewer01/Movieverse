@@ -5,14 +5,15 @@ import unittest
 from pathlib import Path
 
 from pipeline.src.catalog import ROOT, encode, release
-from pipeline.src.pilot import DATASET, REPORT, PilotProjection, audit
+from pipeline.src.pilot import DATASET, FORMAT_REVIEWS, REPORT, PilotProjection, audit
 from pipeline.src.wikidata import EVIDENCE
 
 
 class PilotTests(unittest.TestCase):
     def setUp(self):
         self.snapshot = json.loads(EVIDENCE.read_text(encoding="utf-8"))
-        self.pilot = audit(self.snapshot)
+        self.reviews = json.loads(FORMAT_REVIEWS.read_text(encoding="utf-8"))
+        self.pilot = audit(self.snapshot, self.reviews)
 
     def test_checked_in_release_matches_pinned_snapshot(self):
         self.assertEqual(self.pilot.report["candidates"], 72)
@@ -37,7 +38,7 @@ class PilotTests(unittest.TestCase):
         edited = copy.deepcopy(self.snapshot)
         seed = next(row for row in edited["candidates"] if row["qid"] == "Q125772")
         seed["expected_year"] = 1901
-        result = audit(edited)
+        result = audit(edited, self.reviews)
         row = next(row for row in result.report["rows"] if row["qid"] == seed["qid"])
         self.assertEqual(row["outcome"], "held")
         self.assertIn("expected-year-not-supported", row["flags"])
@@ -45,5 +46,19 @@ class PilotTests(unittest.TestCase):
     def test_format_is_supported_by_type_and_original_titles_are_preserved(self):
         films = {film["provenance"]["qid"]: film for film in self.pilot.records}
         self.assertEqual(films["Q1412119"]["format"], "TV movie")
-        self.assertEqual(films["Q583407"]["format"], "Film")
+        self.assertEqual(films["Q583407"]["format"], "TV movie")
+        self.assertEqual(films["Q583407"]["format_review"]["label"], "Amblin production history")
+        self.assertEqual(self.pilot.report["formats"]["TV movie"], 8)
+        self.assertNotIn("tv-format-unconfirmed", self.pilot.report["flags"])
         self.assertIn("七人の侍", films["Q189540"]["aliases"])
+
+    def test_later_publications_and_filter_genres_do_not_replace_year_or_map_region(self):
+        films = {film["provenance"]["qid"]: film for film in self.pilot.records}
+        duel = films["Q583407"]
+        self.assertEqual(duel["year"], 1971)
+        self.assertEqual(duel["publication_years"], [1971, 1972, 1973, 1974])
+        self.assertIn("Thriller", duel["genres"])
+        self.assertEqual(PilotProjection().region(duel), "Other")
+        alien = films["Q103569"]
+        self.assertIn("Horror", alien["genres"])
+        self.assertEqual(PilotProjection().region(alien), "Science fiction")

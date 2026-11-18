@@ -10,6 +10,7 @@ export const regions = [
   { name: 'Drama', color: '#e7ac89', marker: 'circle' },
   { name: 'Documentary', color: '#cfdb89', marker: 'square' },
   { name: 'Animation', color: '#c4b5e6', marker: 'plus' },
+  { name: 'Other', color: '#adb4b0', marker: 'ring' },
   { name: unmappedGenre, color: '#adb4b0', marker: 'ring' },
 ] as const;
 export const regionByName = new Map<string, typeof regions[number]>(

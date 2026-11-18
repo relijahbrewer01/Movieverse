@@ -6,6 +6,8 @@ export interface Film {
   format: 'Feature' | 'Film' | 'TV movie';
   aliases?: string[];
   countries?: string[];
+  publication_years?: number[];
+  format_review?: { label: string; url: string; reviewed: string; note: string };
   provenance: { source: string; status: string; rights: string; qid?: string; revision?: string; retrieved?: string };
 }
 
