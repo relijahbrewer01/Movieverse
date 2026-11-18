@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { filterFilms } from '../../src/catalog.ts';
 import type { Film } from '../../src/catalog.ts';
 import { home, pan, project, zoom } from '../../src/camera.ts';
+import { denseThreshold, screenMarks } from '../../src/mapView.ts';
 
 const sample: Film[] = [
   { id: 'one', title: 'Café Orbit', year: 1994, format: 'Feature', genres: ['Drama'],
@@ -34,4 +35,16 @@ test('panning moves a world point by the pointer delta', () => {
   const to = { x: from.x + 30, y: from.y - 25 };
   const actual = project(point, pan(home, size, from, to), size);
   assert.ok(Math.hypot(actual.x - to.x, actual.y - to.y) < 1e-8);
+});
+
+test('dense drawing coalesces same-genre marks but preserves selection and other genres', () => {
+  const points = Array.from({ length: denseThreshold + 1 }, (_, index) => ({
+    id: 'dense-' + index, region: 'Drama', x: 0, y: 0,
+  }));
+  points.push({ id: 'offscreen', region: 'Drama', x: 9, y: 9 },
+    { id: 'documentary', region: 'Documentary', x: 0, y: 0 });
+  const marks = screenMarks(points, { width: 400, height: 600 }, home, 'dense-1');
+  assert.deepEqual(marks.groups.get('Drama')?.marks.map(mark => mark.id), ['dense-0']);
+  assert.deepEqual(marks.groups.get('Documentary')?.marks.map(mark => mark.id), ['documentary']);
+  assert.equal(marks.active?.id, 'dense-1');
 });

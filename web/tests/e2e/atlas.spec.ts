@@ -20,6 +20,7 @@ test('the root HTML opens the interactive atlas from disk', async ({ page }, inf
   test.skip(info.project.name !== 'desktop', 'Verifies the local file entry point');
   await page.route(/^https?:\/\//, route => route.abort());
   await page.goto(new URL('../../../index.html', import.meta.url).href);
+  await expect(page.locator('[id="atlas-manifest.v1.json"]')).toHaveCount(1);
   await expect(page.getByRole('heading', { name: 'Movieverse', exact: true })).toBeVisible();
   await expect(page.getByLabel('Interactive map')).toBeVisible();
   await expect(page.getByText(/^(\d+) of \1$/)).toBeVisible();
@@ -65,6 +66,27 @@ test('filter the expanded catalog by country of origin and title', async ({ page
   await expect(page.getByText('No films match these filters.')).toBeVisible();
   await search.fill('Pather Panchali');
   await expect(page.getByRole('button', { name: 'Pather Panchali, 1955, Film' })).toBeVisible();
+});
+
+test('result pages keep the list bounded and search still spans the full catalog', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop', 'Checks pagination shared by both viewports');
+  await page.goto('/');
+  const list = page.getByRole('list', { name: 'Matching films' });
+  const pages = page.getByRole('navigation', { name: 'Film result pages' });
+  const items = list.getByRole('listitem');
+  await expect(pages.getByText(/^1–50 of \d+$/)).toBeVisible();
+  await expect(items).toHaveCount(50);
+  const first = await items.first().textContent();
+  await pages.getByRole('button', { name: 'Next film results' }).click();
+  await expect(pages.getByText(/^51–100 of \d+$/)).toBeVisible();
+  await expect(items).toHaveCount(50);
+  await expect(items.first()).not.toHaveText(first ?? '');
+  const search = page.getByRole('searchbox', { name: 'Title or year' });
+  await search.fill('Solaris 1972');
+  await expect(list.getByRole('button', { name: 'Solaris, 1972, Film' })).toBeVisible();
+  await expect(pages).toHaveCount(0);
+  await search.fill('');
+  await expect(pages.getByText(/^1–50 of \d+$/)).toBeVisible();
 });
 
 test('browse a reviewed TV movie with additional publication years', async ({ page }, info) => {

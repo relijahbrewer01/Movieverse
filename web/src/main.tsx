@@ -6,14 +6,17 @@ import type { Atlas, Filters, Point } from './catalog';
 import './style.css';
 
 const initialFilters = { query: '', genre: '', format: '', country: '' };
+const pageSize = 50;
 
 function Explorer({ atlas }: { atlas: Atlas }) {
   const [filters, setFilters] = useState<Filters>(initialFilters);
+  const [page, setPage] = useState(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [focus, setFocus] = useState<{ point: Point; request: number } | null>(null);
   const title = useRef<HTMLHeadingElement>(null);
   const trigger = useRef<HTMLElement | null>(null);
   const search = useRef<HTMLInputElement>(null);
+  const resultList = useRef<HTMLUListElement>(null);
   const films = useMemo(() => new Map(atlas.films.map(film => [film.id, film])), [atlas]);
   const points = useMemo(() => new Map(atlas.points.map(point => [point.id, point])), [atlas]);
   const genres = useMemo(() => [...new Set(atlas.films.flatMap(film =>
@@ -23,6 +26,7 @@ function Explorer({ atlas }: { atlas: Atlas }) {
     .sort((a, b) => a.localeCompare(b)), [atlas]);
   const mapGroups = useMemo(() => new Set(atlas.points.map(point => point.region)), [atlas]);
   const matches = useMemo(() => filterFilms(atlas.films, filters), [atlas, filters]);
+  const matchPoints = useMemo(() => matches.flatMap(film => points.get(film.id) ?? []), [matches, points]);
   const visible = useMemo(() => new Set(matches.map(film => film.id)), [matches]);
   const selected = selectedId && visible.has(selectedId) ? films.get(selectedId) : null;
   const selectedPoint = selected ? points.get(selected.id) : null;
@@ -30,6 +34,9 @@ function Explorer({ atlas }: { atlas: Atlas }) {
   const qid = selected?.provenance.qid;
   const sourceUrl = qid && /^Q\d+$/.test(qid) ? `https://www.wikidata.org/wiki/${qid}` : null;
   const otherYears = selected?.publication_years?.filter(year => year !== selected.year) ?? [];
+  const firstResult = page * pageSize;
+  const lastResult = Math.min(firstResult + pageSize, matches.length);
+  const pageResults = matches.slice(firstResult, lastResult);
 
   function select(id: string, source: HTMLElement, moveCamera: boolean) {
     trigger.current = source;
@@ -52,14 +59,20 @@ function Explorer({ atlas }: { atlas: Atlas }) {
   function updateFilter(key: keyof Filters, value: string) {
     setSelectedId(null);
     setFocus(null);
+    changePage(0);
     setFilters(current => ({ ...current, [key]: value }));
+  }
+
+  function changePage(next: number) {
+    setPage(next);
+    if (resultList.current) resultList.current.scrollTop = 0;
   }
 
   return (
     <main className="workspace">
       <div className="map-stack">
         <div className="map-area">
-          <AtlasMap points={atlas.points} films={films} visible={visible}
+          <AtlasMap points={matchPoints} films={films}
             selected={selected?.id ?? null} focus={focus} onSelect={select} />
           <section className="legend" aria-label="Map legend">
             <span>Map groups</span>
@@ -128,8 +141,9 @@ function Explorer({ atlas }: { atlas: Atlas }) {
               </select>
             </label>}
           </div>
-          {matches.length ? <ul className="films" aria-label="Matching films">
-            {matches.map(film => {
+          {matches.length ? <>
+            <ul className="films" id="film-results" ref={resultList} aria-label="Matching films">
+            {pageResults.map(film => {
               const style = regionByName.get(points.get(film.id)?.region ?? '');
               return <li key={film.id}>
                 <button type="button" aria-label={film.title + ', ' + (film.year ?? 'unknown year') + ', ' + film.format}
@@ -140,9 +154,18 @@ function Explorer({ atlas }: { atlas: Atlas }) {
                 </button>
               </li>;
             })}
-          </ul> : <div className="empty">
+            </ul>
+            {matches.length > pageSize && <nav className="result-pages" aria-label="Film result pages">
+              <button type="button" aria-controls="film-results" aria-label="Previous film results"
+                aria-disabled={page === 0} onClick={() => { if (page > 0) changePage(page - 1); }}>‹</button>
+              <span aria-live="polite">{firstResult + 1}–{lastResult} of {matches.length}</span>
+              <button type="button" aria-controls="film-results" aria-label="Next film results"
+                aria-disabled={lastResult === matches.length}
+                onClick={() => { if (lastResult < matches.length) changePage(page + 1); }}>›</button>
+            </nav>}
+          </> : <div className="empty">
             <p>No films match these filters.</p>
-            <button type="button" onClick={() => { setFilters(initialFilters); search.current?.focus(); }}>Clear filters</button>
+            <button type="button" onClick={() => { changePage(0); setFilters(initialFilters); search.current?.focus(); }}>Clear filters</button>
           </div>}
         </section>
       </aside>

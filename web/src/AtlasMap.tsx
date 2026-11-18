@@ -1,9 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { KeyboardEvent, PointerEvent } from 'react';
 import { center, distance, home, midpoint, pan, project, zoom } from './camera';
 import type { Camera, Position, Size } from './camera';
 import { unmappedGenre } from './catalog';
 import type { Film, Point } from './catalog';
+import { denseThreshold, screenMarks } from './mapView';
+import type { ScreenMark } from './mapView';
 
 export const regions = [
   { name: 'Science fiction', color: '#9fd1dc', marker: 'diamond' },
@@ -17,15 +19,17 @@ export const regionByName = new Map<string, typeof regions[number]>(
   regions.map(region => [region.name, region]),
 );
 const mono = 'ui-monospace, Consolas, monospace';
+const labelLimit = 50;
 
 interface Props {
   points: Point[];
   films: Map<string, Film>;
-  visible: Set<string>;
   selected: string | null;
   focus: { point: Point; request: number } | null;
   onSelect: (id: string, source: HTMLElement, moveCamera: boolean) => void;
 }
+
+type Bounds = { left: number; right: number; top: number; bottom: number };
 
 function drawGrid(ctx: CanvasRenderingContext2D, size: Size, camera: Camera) {
   const origin = project({ x: 0, y: 0 }, camera, size);
@@ -56,46 +60,37 @@ function drawGrid(ctx: CanvasRenderingContext2D, size: Size, camera: Camera) {
   ctx.setLineDash([]);
 }
 
-function drawMarker(
-  ctx: CanvasRenderingContext2D, { x, y }: Position,
+function addMarker(
+  path: Path2D, { x, y }: Position,
   marker: typeof regions[number]['marker'], radius: number,
 ) {
   switch (marker) {
     case 'circle':
-      ctx.beginPath();
-      ctx.arc(x, y, radius, 0, Math.PI * 2);
-      ctx.fill();
+    case 'ring':
+      path.moveTo(x + radius, y);
+      path.arc(x, y, radius, 0, Math.PI * 2);
       break;
     case 'diamond':
-      ctx.beginPath();
-      ctx.moveTo(x, y - radius - 1);
-      ctx.lineTo(x + radius + 1, y);
-      ctx.lineTo(x, y + radius + 1);
-      ctx.lineTo(x - radius - 1, y);
-      ctx.closePath();
-      ctx.fill();
+      path.moveTo(x, y - radius - 1);
+      path.lineTo(x + radius + 1, y);
+      path.lineTo(x, y + radius + 1);
+      path.lineTo(x - radius - 1, y);
+      path.closePath();
       break;
     case 'square':
-      ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+      path.rect(x - radius, y - radius, radius * 2, radius * 2);
       break;
     case 'plus':
-      ctx.fillRect(x - radius - 1, y - 1, radius * 2 + 2, 2);
-      ctx.fillRect(x - 1, y - radius - 1, 2, radius * 2 + 2);
-      break;
-    case 'ring':
-      ctx.strokeStyle = ctx.fillStyle;
-      ctx.beginPath();
-      ctx.arc(x, y, radius, 0, Math.PI * 2);
-      ctx.stroke();
+      path.rect(x - radius - 1, y - 1, radius * 2 + 2, 2);
+      path.rect(x - 1, y - radius - 1, 2, radius * 2 + 2);
       break;
   }
 }
 
-function drawRegionLabels(ctx: CanvasRenderingContext2D, size: Size, camera: Camera, props: Props) {
-  const bounds = new Map<string, { left: number; right: number; top: number; bottom: number }>();
-  for (const point of props.points) {
-    if (!props.visible.has(point.id)) continue;
-    const { x, y } = project(point, camera, size);
+function regionBounds(points: Point[]) {
+  const bounds = new Map<string, Bounds>();
+  for (const point of points) {
+    const { x, y } = point;
     const region = bounds.get(point.region);
     if (region) {
       region.left = Math.min(region.left, x);
@@ -106,13 +101,19 @@ function drawRegionLabels(ctx: CanvasRenderingContext2D, size: Size, camera: Cam
       bounds.set(point.region, { left: x, right: x, top: y, bottom: y });
     }
   }
+  return bounds;
+}
+
+function drawRegionLabels(ctx: CanvasRenderingContext2D, size: Size, camera: Camera, bounds: Map<string, Bounds>) {
   ctx.font = '600 11px ' + mono;
   ctx.textAlign = 'center';
   for (const region of regions) {
     const box = bounds.get(region.name);
     if (!box) continue;
-    const x = (box.left + box.right) / 2;
-    const y = box.top >= 26 ? box.top - 12 : box.bottom + 21;
+    const top = project({ x: (box.left + box.right) / 2, y: box.top }, camera, size);
+    const bottom = project({ x: 0, y: box.bottom }, camera, size);
+    const x = top.x;
+    const y = top.y >= 26 ? top.y - 12 : bottom.y + 21;
     if (y < 14 || y > size.height - 8) continue;
     const label = region.name.toUpperCase();
     const width = ctx.measureText(label).width;
@@ -123,56 +124,77 @@ function drawRegionLabels(ctx: CanvasRenderingContext2D, size: Size, camera: Cam
   }
 }
 
-function paint(canvas: HTMLCanvasElement, size: Size, camera: Camera, props: Props) {
+function paint(canvas: HTMLCanvasElement, size: Size, camera: Camera, props: Props, bounds: Map<string, Bounds>) {
   const ctx = canvas.getContext('2d');
   if (!ctx) return;
   ctx.setTransform(canvas.width / size.width, 0, 0, canvas.height / size.height, 0, 0);
   ctx.clearRect(0, 0, size.width, size.height);
   drawGrid(ctx, size, camera);
 
-  if (camera.zoom <= 2.3) drawRegionLabels(ctx, size, camera, props);
+  if (camera.zoom <= 2.3) drawRegionLabels(ctx, size, camera, bounds);
 
-  for (const point of props.points) {
-    if (!props.visible.has(point.id)) continue;
-    const at = project(point, camera, size);
-    if (at.x < -20 || at.x > size.width + 20 || at.y < -20 || at.y > size.height + 20) continue;
-    const active = point.id === props.selected;
-    const region = regionByName.get(point.region);
-    const color = region?.color ?? '#e9ede4';
-    ctx.fillStyle = active ? '#ffffff' : color;
-    drawMarker(ctx, at, region?.marker ?? 'circle', active ? 4.5 : 3);
-    if (active) {
-      ctx.strokeStyle = color;
-      ctx.strokeRect(at.x - 9, at.y - 9, 18, 18);
+  const { groups, active } = screenMarks(props.points, size, camera, props.selected);
+  for (const [name, { marks }] of groups) {
+    const region = regionByName.get(name);
+    const marker = region?.marker ?? 'circle';
+    const shape = new Path2D();
+    for (const mark of marks) addMarker(shape, mark, marker, 3);
+    if (marker === 'ring') {
+      ctx.strokeStyle = region?.color ?? '#e9ede4';
+      ctx.stroke(shape);
+    } else {
+      ctx.fillStyle = region?.color ?? '#e9ede4';
+      ctx.fill(shape);
     }
+  }
+  if (active) {
+    const region = regionByName.get(active.region);
+    const marker = region?.marker ?? 'circle';
+    const shape = new Path2D();
+    addMarker(shape, active, marker, 4.5);
+    if (marker === 'ring') {
+      ctx.strokeStyle = '#ffffff';
+      ctx.stroke(shape);
+    } else {
+      ctx.fillStyle = '#ffffff';
+      ctx.fill(shape);
+    }
+    ctx.strokeStyle = region?.color ?? '#e9ede4';
+    ctx.strokeRect(active.x - 9, active.y - 9, 18, 18);
   }
 
   const occupied: { x: number; y: number; width: number }[] = [];
-  const candidates = props.points.filter(point => props.visible.has(point.id) &&
-    (point.id === props.selected || camera.zoom >= 2.6));
-  candidates.sort((a, b) => Number(b.id === props.selected) - Number(a.id === props.selected));
-  for (const point of candidates) {
-    const at = project(point, camera, size);
-    const label = props.films.get(point.id)?.title;
-    if (!label || at.x < 0 || at.y < 14 || at.y > size.height - 8) continue;
-    ctx.font = '600 11px ' + mono;
-    ctx.textAlign = 'left';
+  ctx.font = '600 11px ' + mono;
+  ctx.textAlign = 'left';
+  function drawLabel(at: ScreenMark) {
+    if (!ctx || at.x < 0 || at.x > size.width || at.y < 14 || at.y > size.height - 8) return;
+    const label = props.films.get(at.id)?.title;
+    if (!label) return;
     const width = ctx.measureText(label).width;
     const x = Math.min(at.x + 13, size.width - width - 6);
-    if (x < 0 || at.x > size.width || occupied.some(box =>
-      Math.abs(box.y - at.y) < 17 && box.x < x + width + 5 && x < box.x + box.width + 5)) continue;
+    if (x < 0 || occupied.some(box =>
+      Math.abs(box.y - at.y) < 17 && box.x < x + width + 5 && x < box.x + box.width + 5)) return;
     occupied.push({ x, y: at.y, width });
     ctx.fillStyle = '#121610';
     ctx.fillRect(x - 3, at.y - 8, width + 6, 16);
     ctx.fillStyle = '#e9ede4';
     ctx.fillText(label, x, at.y + 4);
   }
+  if (active) drawLabel(active);
+  if (camera.zoom < 2.6) return;
+  for (const { marks } of groups.values()) {
+    for (const mark of marks) {
+      if (occupied.length >= labelLimit) return;
+      drawLabel(mark);
+    }
+  }
 }
 
 export function AtlasMap(props: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const scaleRef = useRef<HTMLSpanElement>(null);
-  const current = useRef(props);
+  const bounds = useMemo(() => regionBounds(props.points), [props.points]);
+  const current = useRef({ ...props, bounds });
   const size = useRef<Size>({ width: 1, height: 1 });
   const camera = useRef<Camera>(home);
   const frame = useRef(0);
@@ -184,7 +206,7 @@ export function AtlasMap(props: Props) {
     if (frame.current) return;
     frame.current = requestAnimationFrame(() => {
       frame.current = 0;
-      if (canvasRef.current) paint(canvasRef.current, size.current, camera.current, current.current);
+      if (canvasRef.current) paint(canvasRef.current, size.current, camera.current, current.current, current.current.bounds);
       const scale = Math.round(camera.current.zoom * 100) + '%';
       if (scaleRef.current && scaleRef.current.textContent !== scale) {
         scaleRef.current.textContent = scale;
@@ -199,9 +221,9 @@ export function AtlasMap(props: Props) {
   }
 
   useEffect(() => {
-    current.current = props;
+    current.current = { ...props, bounds };
     render();
-  }, [props]);
+  }, [props, bounds]);
 
   const focus = props.focus;
   useEffect(() => {
@@ -301,14 +323,16 @@ export function AtlasMap(props: Props) {
     const at = location(event);
     let nearest: string | null = null;
     let best = event.pointerType === 'touch' ? 23 : 15;
-    for (const point of current.current.points) {
-      if (!current.current.visible.has(point.id)) continue;
-      const gap = distance(at, project(point, camera.current, size.current));
+    const { groups, active } = screenMarks(current.current.points, size.current, camera.current, current.current.selected);
+    function consider(point: ScreenMark) {
+      const gap = distance(at, point);
       if (gap < best) {
         best = gap;
         nearest = point.id;
       }
     }
+    if (active) consider(active);
+    for (const { marks } of groups.values()) for (const mark of marks) consider(mark);
     if (nearest) current.current.onSelect(nearest, event.currentTarget, false);
   }
 
@@ -351,6 +375,7 @@ export function AtlasMap(props: Props) {
       <p className="map-help" id="map-help">
         <span className="touch-help">Drag to pan · Pinch to zoom</span>
         <span className="desktop-help">Drag or use arrow keys to pan · Scroll or press +/− to zoom</span>
+        {props.points.length > denseThreshold && <span> · Close films can share a marker. Zoom in or use the results.</span>}
         <span className="sr-only"> Use the film list to select a movie with a keyboard.</span>
       </p>
     </section>

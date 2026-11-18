@@ -249,6 +249,18 @@ input::placeholder { color: #929d8d; }
 .films small, .film-year { color: var(--muted); font: .7rem/1.4 var(--mono); }
 .film-year { margin-left: auto; text-align: right; }
 
+.result-pages {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+  margin-top: 12px;
+  color: var(--muted);
+  font: .7rem var(--mono);
+}
+.result-pages button { min-width: 44px; color: var(--signal); font-size: 1.1rem; }
+.result-pages button[aria-disabled='true'] { opacity: .48; cursor: default; }
+
 .details { border-top: 2px solid var(--signal); scroll-margin-top: 12px; }
 .kicker { margin-bottom: 5px; color: var(--signal); font: .7rem var(--mono); text-transform: uppercase; }
 .close { min-width: 44px; font-size: 1.2rem; }

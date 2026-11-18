@@ -38,15 +38,23 @@ function fold(value: string) {
   return value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 }
 
+const searchText = new WeakMap<Film, string>();
+
 export function filterFilms(films: Film[], filters: Filters) {
   const words = fold(filters.query).trim().split(/\s+/).filter(Boolean);
+  if (!words.length && !filters.genre && !filters.format && !filters.country) return films;
   return films.filter(film => {
-    const searchable = fold([film.title, ...(film.aliases ?? []), film.year ?? ''].join(' '));
     const matchesGenre = film.genres.length ? film.genres.includes(filters.genre) : filters.genre === unmappedGenre;
-    return (!filters.genre || matchesGenre) &&
-      (!filters.format || film.format === filters.format) &&
-      (!filters.country || film.countries?.includes(filters.country)) &&
-      words.every(word => searchable.includes(word));
+    if ((filters.genre && !matchesGenre) ||
+        (filters.format && film.format !== filters.format) ||
+        (filters.country && !film.countries?.includes(filters.country))) return false;
+    if (!words.length) return true;
+    let searchable = searchText.get(film);
+    if (searchable === undefined) {
+      searchable = fold([film.title, ...(film.aliases ?? []), film.year ?? ''].join(' '));
+      searchText.set(film, searchable);
+    }
+    return words.every(word => searchable.includes(word));
   });
 }
 
