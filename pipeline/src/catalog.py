@@ -7,7 +7,7 @@ import math
 import re
 from collections import Counter
 from pathlib import Path
-from typing import Iterable, Protocol, TypedDict
+from typing import Iterable, NotRequired, Protocol, TypedDict
 
 ROOT = Path(__file__).resolve().parents[2]
 REGIONS = {
@@ -15,6 +15,7 @@ REGIONS = {
     "Drama": (0.56, -0.50),
     "Documentary": (-0.51, 0.54),
     "Animation": (0.89, 0.46),
+    "Unmapped": (0, 0),
 }
 PROVENANCE = {"source": "movieverse-fixtures", "status": "fictional", "rights": "CC0-1.0"}
 
@@ -26,6 +27,8 @@ class Film(TypedDict):
     genres: list[str]
     format: str
     provenance: dict[str, str]
+    aliases: NotRequired[list[str]]
+    countries: NotRequired[list[str]]
 
 
 class CatalogSource(Protocol):
@@ -68,17 +71,18 @@ class Projection(Protocol):
 
 class DemoProjection:
     id = "genre-regions-v1"
+    spacing = 0.12
 
     def points(self, films: list[Film]) -> list[dict]:
         counts: Counter[str] = Counter()
         points = []
         for film in films:
-            region = film["genres"][0]
+            region = film["genres"][0] if film["genres"] else "Unmapped"
             index = counts[region]
             counts[region] += 1
             center_x, center_y = REGIONS[region]
             angle = index * 2.3999632297
-            radius = 0.12 * math.sqrt(index)
+            radius = self.spacing * math.sqrt(index)
             points.append({
                 "id": film["id"], "region": region,
                 "x": round(center_x + math.cos(angle) * radius, 4),
@@ -92,7 +96,8 @@ def encode(value: object) -> bytes:
                        allow_nan=False) + "\n").encode("utf-8")
 
 
-def release(source: CatalogSource, projection: Projection, output: Path) -> dict:
+def release(source: CatalogSource, projection: Projection, output: Path, *,
+            dataset: str = "fictional-demo") -> dict:
     films = sorted(source.films(), key=lambda film: film["id"])
     ids = {film["id"] for film in films}
     if not ids or len(films) != len(ids):
@@ -105,7 +110,7 @@ def release(source: CatalogSource, projection: Projection, output: Path) -> dict
     geometry = encode({"schema": 1, "projection": projection.id, "points": points})
     revision = hashlib.sha256(catalog + geometry).hexdigest()[:16]
     manifest = {
-        "schema": 1, "revision": revision, "dataset": "fictional-demo",
+        "schema": 1, "revision": revision, "dataset": dataset,
         "catalog": "catalog.v1.json", "geometry": "geometry.v1.json",
         "projection": projection.id, "count": len(films),
     }
@@ -120,7 +125,7 @@ def release(source: CatalogSource, projection: Projection, output: Path) -> dict
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, default=ROOT / "data/sample")
+    parser.add_argument("--output", type=Path, default=ROOT / "data/demo")
     args = parser.parse_args()
     manifest = release(FixtureSource(ROOT / "pipeline/fixtures/films.json"),
                        DemoProjection(), args.output)

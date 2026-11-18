@@ -3,8 +3,10 @@ export interface Film {
   title: string;
   year: number | null;
   genres: string[];
-  format: 'Feature' | 'TV movie';
-  provenance: { source: string; status: string; rights: string };
+  format: 'Feature' | 'Film' | 'TV movie';
+  aliases?: string[];
+  countries?: string[];
+  provenance: { source: string; status: string; rights: string; qid?: string; revision?: string; retrieved?: string };
 }
 
 export interface Point {
@@ -18,6 +20,7 @@ export interface Atlas {
   films: Film[];
   points: Point[];
   revision: string;
+  dataset: 'fictional-demo' | 'wikidata-pilot';
 }
 
 export interface Filters {
@@ -26,6 +29,8 @@ export interface Filters {
   format: string;
 }
 
+export const unmappedGenre = 'Unmapped';
+
 function fold(value: string) {
   return value.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 }
@@ -33,8 +38,9 @@ function fold(value: string) {
 export function filterFilms(films: Film[], filters: Filters) {
   const words = fold(filters.query).trim().split(/\s+/).filter(Boolean);
   return films.filter(film => {
-    const searchable = fold(film.title + ' ' + (film.year ?? ''));
-    return (!filters.genre || film.genres.includes(filters.genre)) &&
+    const searchable = fold([film.title, ...(film.aliases ?? []), film.year ?? ''].join(' '));
+    const matchesGenre = film.genres.length ? film.genres.includes(filters.genre) : filters.genre === unmappedGenre;
+    return (!filters.genre || matchesGenre) &&
       (!filters.format || film.format === filters.format) &&
       words.every(word => searchable.includes(word));
   });
@@ -53,7 +59,7 @@ export async function loadAtlas(signal: AbortSignal): Promise<Atlas> {
     schema: number; revision: string; catalog: string; geometry: string;
     projection: string; count: number; dataset: string;
   }>('manifest.v1.json', signal);
-  if (manifest.schema !== 1 || manifest.dataset !== 'fictional-demo' ||
+  if (manifest.schema !== 1 || (manifest.dataset !== 'fictional-demo' && manifest.dataset !== 'wikidata-pilot') ||
       manifest.catalog !== 'catalog.v1.json' || manifest.geometry !== 'geometry.v1.json') {
     throw new Error('Unsupported atlas release');
   }
@@ -70,5 +76,5 @@ export async function loadAtlas(signal: AbortSignal): Promise<Atlas> {
       geometry.points.some(point => !ids.has(point.id) || !Number.isFinite(point.x) || !Number.isFinite(point.y))) {
     throw new Error('Inconsistent atlas release');
   }
-  return { films: catalog.films, points: geometry.points, revision: manifest.revision };
+  return { films: catalog.films, points: geometry.points, revision: manifest.revision, dataset: manifest.dataset };
 }

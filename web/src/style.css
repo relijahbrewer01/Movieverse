@@ -160,6 +160,7 @@ canvas:active { cursor: grabbing; }
   background: currentColor;
 }
 .marker[data-shape='circle'] { border-radius: 50%; }
+.marker[data-shape='ring'] { border: 1px solid currentColor; border-radius: 50%; background: transparent; }
 .marker[data-shape='diamond'] { transform: rotate(45deg) scale(.78); }
 .marker[data-shape='plus'] { clip-path: polygon(36% 0, 64% 0, 64% 36%, 100% 36%, 100% 64%, 64% 64%, 64% 100%, 36% 100%, 36% 64%, 0 64%, 0 36%, 36% 36%); }
 
@@ -251,7 +252,9 @@ input::placeholder { color: #929d8d; }
 .kicker { margin-bottom: 5px; color: var(--signal); font: .7rem var(--mono); text-transform: uppercase; }
 .close { min-width: 44px; font-size: 1.2rem; }
 dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; }
-dd { margin: 4px 0 0; font-size: .82rem; }
+dd { margin: 4px 0 0; font-size: .82rem; overflow-wrap: anywhere; }
+dd a { color: var(--signal); }
+.detail-wide { grid-column: 1 / -1; }
 .atlas-caption, .status, .empty { color: var(--muted); font-size: .79rem; line-height: 1.5; }
 .atlas-caption { padding: 9px 0 0; }
 .status, .empty { padding-block: 14px; }

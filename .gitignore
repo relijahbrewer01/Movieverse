@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 .env*
 data/raw/
+data/demo/
 data/private/
 playwright-report/
 test-results/

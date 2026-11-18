@@ -1,7 +1,7 @@
 import { StrictMode, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AtlasMap, regionByName, regions } from './AtlasMap';
-import { filterFilms, loadAtlas } from './catalog';
+import { filterFilms, loadAtlas, unmappedGenre } from './catalog';
 import type { Atlas, Filters, Point } from './catalog';
 import './style.css';
 
@@ -16,12 +16,17 @@ function Explorer({ atlas }: { atlas: Atlas }) {
   const search = useRef<HTMLInputElement>(null);
   const films = useMemo(() => new Map(atlas.films.map(film => [film.id, film])), [atlas]);
   const points = useMemo(() => new Map(atlas.points.map(point => [point.id, point])), [atlas]);
-  const genres = useMemo(() => [...new Set(atlas.films.flatMap(film => film.genres))].sort(), [atlas]);
+  const genres = useMemo(() => [...new Set(atlas.films.flatMap(film =>
+    film.genres.length ? film.genres : [unmappedGenre]))].sort(), [atlas]);
+  const formats = useMemo(() => [...new Set(atlas.films.map(film => film.format))].sort(), [atlas]);
+  const mapGroups = useMemo(() => new Set(atlas.points.map(point => point.region)), [atlas]);
   const matches = useMemo(() => filterFilms(atlas.films, filters), [atlas, filters]);
   const visible = useMemo(() => new Set(matches.map(film => film.id)), [matches]);
   const selected = selectedId && visible.has(selectedId) ? films.get(selectedId) : null;
   const selectedPoint = selected ? points.get(selected.id) : null;
   const region = selectedPoint?.region ?? '';
+  const qid = selected?.provenance.qid;
+  const sourceUrl = qid && /^Q\d+$/.test(qid) ? `https://www.wikidata.org/wiki/${qid}` : null;
 
   function select(id: string, source: HTMLElement, moveCamera: boolean) {
     trigger.current = source;
@@ -54,12 +59,12 @@ function Explorer({ atlas }: { atlas: Atlas }) {
           <AtlasMap points={atlas.points} films={films} visible={visible}
             selected={selected?.id ?? null} focus={focus} onSelect={select} />
           <section className="legend" aria-label="Map legend">
-            <span>Primary genre</span>
-            <ul>{regions.map(({ name, marker, color }) =>
+            <span>Map groups</span>
+            <ul>{regions.filter(({ name }) => mapGroups.has(name)).map(({ name, marker, color }) =>
               <li key={name}><span className="marker" data-shape={marker} style={{ color }} aria-hidden="true" />{name}</li>)}</ul>
           </section>
         </div>
-        <p className="atlas-caption">Positions group films by primary genre. Distance does not measure film similarity.</p>
+        <p className="atlas-caption">Positions group films by mapped genre. Distance does not measure film similarity.</p>
       </div>
 
       <aside className="sidebar" aria-label="Film explorer">
@@ -67,7 +72,7 @@ function Explorer({ atlas }: { atlas: Atlas }) {
           onKeyDown={event => { if (event.key === 'Escape') closeDetails(); }}>
           <div className="detail-top">
             <div>
-              <p className="kicker">Fictional film</p>
+              <p className="kicker">{sourceUrl ? 'Wikidata record' : 'Fictional film'}</p>
               <h2 id="film-title" tabIndex={-1} ref={title}>{selected.title}</h2>
             </div>
             <button type="button" className="close" aria-label="Close film details" onClick={closeDetails}>×</button>
@@ -75,8 +80,14 @@ function Explorer({ atlas }: { atlas: Atlas }) {
           <dl>
             <div><dt>Year</dt><dd>{selected.year ?? 'Unknown'}</dd></div>
             <div><dt>Format</dt><dd>{selected.format}</dd></div>
-            <div><dt>Genres</dt><dd>{selected.genres.join(', ')}</dd></div>
-            <div><dt>Source</dt><dd>Movieverse fixtures · {selected.provenance.rights}</dd></div>
+            <div><dt>Mapped genres</dt><dd>{selected.genres.join(', ') || unmappedGenre}</dd></div>
+            <div><dt>Source</dt><dd>{sourceUrl ?
+              <a href={sourceUrl} target="_blank" rel="noreferrer">Wikidata {qid}</a> : 'Movieverse fixtures'}
+              {' · ' + selected.provenance.rights}</dd></div>
+            {selected.countries && selected.countries.length > 0 &&
+              <div><dt>Country of origin</dt><dd>{selected.countries.join(', ')}</dd></div>}
+            {selected.aliases && selected.aliases.length > 0 &&
+              <div className="detail-wide"><dt>Also listed as</dt><dd>{selected.aliases.join(' · ')}</dd></div>}
           </dl>
         </section>}
         <section className="search-panel" aria-labelledby="explore">
@@ -86,7 +97,8 @@ function Explorer({ atlas }: { atlas: Atlas }) {
           </div>
           <label className="search-label" htmlFor="search">Title or year</label>
           <div className="search-field">
-            <input ref={search} id="search" type="search" placeholder="e.g. Paper Sun" value={filters.query}
+            <input ref={search} id="search" type="search"
+              placeholder={atlas.dataset === 'wikidata-pilot' ? 'e.g. Solaris 1972' : 'e.g. Paper Sun'} value={filters.query}
               onChange={event => updateFilter('query', event.target.value)} />
           </div>
           <div className="filters">
@@ -95,7 +107,8 @@ function Explorer({ atlas }: { atlas: Atlas }) {
               {genres.map(genre => <option key={genre}>{genre}</option>)}
             </select></label>
             <label>Format<select value={filters.format} onChange={event => updateFilter('format', event.target.value)}>
-              <option value="">All formats</option><option>Feature</option><option>TV movie</option>
+              <option value="">All formats</option>
+              {formats.map(format => <option key={format}>{format}</option>)}
             </select></label>
           </div>
           {matches.length ? <ul className="films" aria-label="Matching films">
@@ -137,7 +150,9 @@ function App() {
     <div className="shell">
       <header className="masthead">
         <div className="wordmark"><span className="aperture" aria-hidden="true" /><h1>Movieverse</h1></div>
-        <p className="catalog-status">Demo atlas <span> / </span> Fictional films</p>
+        {atlas?.dataset === 'wikidata-pilot'
+          ? <p className="catalog-status">Pilot atlas <span> / </span> Wikidata</p>
+          : atlas && <p className="catalog-status">Demo atlas <span> / </span> Fictional films</p>}
       </header>
       {atlas ? <Explorer atlas={atlas} /> : error ?
         <section className="status" role="alert"><p>The atlas couldn’t load.</p>

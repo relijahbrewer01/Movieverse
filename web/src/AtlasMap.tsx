@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { KeyboardEvent, PointerEvent } from 'react';
 import { center, distance, home, midpoint, pan, project, zoom } from './camera';
 import type { Camera, Position, Size } from './camera';
+import { unmappedGenre } from './catalog';
 import type { Film, Point } from './catalog';
 
 export const regions = [
@@ -9,6 +10,7 @@ export const regions = [
   { name: 'Drama', color: '#e7ac89', marker: 'circle' },
   { name: 'Documentary', color: '#cfdb89', marker: 'square' },
   { name: 'Animation', color: '#c4b5e6', marker: 'plus' },
+  { name: unmappedGenre, color: '#adb4b0', marker: 'ring' },
 ] as const;
 export const regionByName = new Map<string, typeof regions[number]>(
   regions.map(region => [region.name, region]),
@@ -78,6 +80,12 @@ function drawMarker(
     case 'plus':
       ctx.fillRect(x - radius - 1, y - 1, radius * 2 + 2, 2);
       ctx.fillRect(x - 1, y - radius - 1, 2, radius * 2 + 2);
+      break;
+    case 'ring':
+      ctx.strokeStyle = ctx.fillStyle;
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.stroke();
       break;
   }
 }
