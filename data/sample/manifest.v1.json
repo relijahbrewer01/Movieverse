@@ -1,1 +1,1 @@
-{"catalog":"catalog.v1.json","count":32,"dataset":"fictional-demo","geometry":"geometry.v1.json","projection":"genre-regions-v1","revision":"c831d7bf638a9a41","schema":1}
+{"catalog":"catalog.v1.json","count":71,"dataset":"wikidata-pilot","geometry":"geometry.v1.json","projection":"pilot-genre-groups-v1","revision":"f07b12e7adab5504","schema":1}

@@ -9,14 +9,15 @@ class CatalogTests(unittest.TestCase):
     def setUp(self):
         self.source = FixtureSource(ROOT / "pipeline/fixtures/films.json")
 
-    def test_release_is_reproducible_and_sample_is_current(self):
+    def test_fixture_release_is_reproducible(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory)
             manifest = release(self.source, DemoProjection(), output)
             self.assertEqual(manifest["count"], 32)
+            second = output / "second"
+            release(self.source, DemoProjection(), second)
             for name in (manifest["catalog"], manifest["geometry"], "manifest.v1.json"):
-                self.assertEqual((output / name).read_bytes(),
-                                 (ROOT / "data/sample" / name).read_bytes())
+                self.assertEqual((output / name).read_bytes(), (second / name).read_bytes())
 
     def test_same_title_and_tv_films_are_preserved(self):
         films = list(self.source.films())
