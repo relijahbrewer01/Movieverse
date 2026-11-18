@@ -8,26 +8,40 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 
-from .catalog import ROOT, DemoProjection, Film, encode, release
+from .catalog import ROOT, DemoProjection, Film, FormatReview, encode, release
 from .wikidata import EVIDENCE
 
 DATASET = "wikidata-pilot"
 REPORT = EVIDENCE.parent / "audit.json"
+FORMAT_REVIEWS = EVIDENCE.parent / "format-reviews.json"
 FILM_TYPES = {"Q11424", "Q506240", "Q20650540", "Q202866"}
 TV_FILM = "Q506240"
 # The first matching group controls placement. Animation and documentary can overlap.
-GENRE_GROUPS = {
+MAP_GENRES = {
     "Animation": {"Q20650540", "Q202866", "Q138831212", "Q4765076"},
     "Documentary": {"Q93204", "Q4765076"},
     "Science fiction": {"Q471839", "Q20656232", "Q108084492", "Q10663882", "Q725757"},
     "Drama": {"Q130232", "Q7168625", "Q113485322", "Q63214877", "Q859369",
               "Q127739154", "Q21010853"},
 }
+FILTER_GENRES = MAP_GENRES | {
+    "Action": {"Q188473", "Q20656232", "Q3990883", "Q1033891"},
+    "Comedy": {"Q157443", "Q859369", "Q53094", "Q224700"},
+    "Crime": {"Q959790", "Q113485322", "Q19367312"},
+    "Fantasy": {"Q157394", "Q15637301"},
+    "Horror": {"Q200092", "Q10663882", "Q224700", "Q853630", "Q102260466"},
+    "Romance": {"Q1054574"},
+    "Sports": {"Q111278985"},
+    "Thriller": {"Q2484376", "Q19367312", "Q3990883", "Q109733333"},
+}
 
 
 class PilotProjection(DemoProjection):
-    id = "pilot-genre-groups-v1"
+    id = "pilot-genre-groups-v2"
     spacing = 0.074
+
+    def region(self, film: Film) -> str:
+        return next((genre for genre in film["genres"] if genre in MAP_GENRES), "Other")
 
 
 @dataclass
@@ -56,12 +70,13 @@ def label_key(title: str) -> str:
                    if character.isalnum())
 
 
-def audit(snapshot: dict) -> Pilot:
+def audit(snapshot: dict, format_reviews: dict[str, FormatReview] | None = None) -> Pilot:
     films: list[Film] = []
     rows = []
     title_groups = defaultdict(list)
     accepted_ids = set()
     terms = snapshot["terms"]
+    format_reviews = format_reviews or {}
 
     for seed in snapshot["candidates"]:
         qid = seed["qid"]
@@ -107,22 +122,30 @@ def audit(snapshot: dict) -> Pilot:
         row["selected_year_statements"] = sorted(dates[year])
 
         genre_ids = {entry["value"] for entry in active(entity, "P136") if isinstance(entry["value"], str)}
-        genres = [name for name, ids in GENRE_GROUPS.items() if ids & (genre_ids | types)]
+        genres = [name for name, ids in FILTER_GENRES.items() if ids & (genre_ids | types)]
         if not genre_ids:
             row["flags"].append("missing-genre-claims")
         if not genres:
             row["flags"].append("no-mapped-genre")
-        film_format = "TV movie" if TV_FILM in types else "Film"
+        review = format_reviews.get(qid) if seed["tv_candidate"] else None
+        film_format = "TV movie" if TV_FILM in types or review else "Film"
+        if review:
+            row["format_review"] = review
+            row["flags"].append("tv-format-confirmed-by-review")
         if seed["tv_candidate"] and film_format != "TV movie":
             row["flags"].append("tv-format-unconfirmed")
         country_ids = {entry["value"] for entry in active(entity, "P495") if isinstance(entry["value"], str)}
         countries = sorted({terms.get(term, term) for term in country_ids})
-        films.append(Film(id=f"mv:wd:{qid}", title=title, year=year, aliases=aliases,
-                         genres=genres, format=film_format, countries=countries, provenance={
+        film = Film(id=f"mv:wd:{qid}", title=title, year=year, aliases=aliases,
+                    genres=genres, format=film_format, countries=countries,
+                    publication_years=sorted(dates), provenance={
                              "source": "wikidata", "status": "pilot", "rights": snapshot["rights"],
                              "qid": qid, "revision": str(entity["revision"]),
                              "retrieved": snapshot["retrieved"],
-                         }))
+                         })
+        if review:
+            film["format_review"] = review
+        films.append(film)
         accepted_ids.add(qid)
         row.update(outcome="included", format=film_format, mapped_genres=genres)
         title_groups[label_key(title)].append(row)
@@ -148,8 +171,10 @@ def main() -> None:
     parser.add_argument("--snapshot", type=Path, default=EVIDENCE)
     parser.add_argument("--output", type=Path, default=ROOT / "data/sample")
     parser.add_argument("--report", type=Path, default=REPORT)
+    parser.add_argument("--format-reviews", type=Path, default=FORMAT_REVIEWS)
     args = parser.parse_args()
-    pilot = audit(json.loads(args.snapshot.read_text(encoding="utf-8")))
+    pilot = audit(json.loads(args.snapshot.read_text(encoding="utf-8")),
+                  json.loads(args.format_reviews.read_text(encoding="utf-8")))
     manifest = release(pilot, PilotProjection(), args.output, dataset=DATASET)
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_bytes(encode(pilot.report))
