@@ -13,6 +13,8 @@ from .catalog import ROOT, encode
 
 EVIDENCE = ROOT / "data/wikidata-pilot/snapshot.json"
 EXPANSION = ROOT / "data/wikidata-pilot/expansion.json"
+COVERAGE = ROOT / "data/wikidata-pilot/coverage.json"
+PILOT_BATCHES = (EVIDENCE, EXPANSION, COVERAGE)
 SEEDS = ROOT / "pipeline/fixtures/wikidata-candidates.txt"
 PROPERTIES = ("P31", "P136", "P1476", "P495", "P577")
 USER_AGENT = "MovieversePilot/0.1 (https://github.com/relijahbrewer01/Movieverse)"
@@ -114,7 +116,7 @@ def snapshot(seed_file: Path = SEEDS) -> dict:
     }
 
 
-def load_snapshots(paths: list[Path]) -> dict:
+def load_snapshots(paths: list[Path] | tuple[Path, ...]) -> dict:
     """Combine pinned batches in order, preserving the first evidence for each QID."""
     batches = [(path.stem, json.loads(path.read_text(encoding="utf-8"))) for path in paths]
     rights = {batch["rights"] for _, batch in batches}

@@ -11,7 +11,7 @@ from pathlib import Path
 
 from .catalog import ROOT, DemoProjection, Film, FormatReview, encode, release
 from .catalog_db import DATABASE, open_catalog, rebuild_database
-from .wikidata import EVIDENCE, EXPANSION, load_snapshots
+from .wikidata import EVIDENCE, PILOT_BATCHES, load_snapshots
 
 DATASET = "wikidata-pilot"
 REPORT = EVIDENCE.parent / "audit.json"
@@ -29,12 +29,14 @@ MAP_GENRES = {
 }
 FILTER_GENRES = MAP_GENRES | {
     "Action": {"Q188473", "Q20656232", "Q3990883", "Q1033891"},
+    "Biography": {"Q645928"},
     "Comedy": {"Q157443", "Q859369", "Q53094", "Q224700", "Q138603203", "Q860626", "Q118612349"},
     "Crime": {"Q959790", "Q113485322", "Q19367312"},
     "Docufiction": {"Q472637"},
     "Fantasy": {"Q157394", "Q15637301"},
-    "Horror": {"Q200092", "Q10663882", "Q224700", "Q853630", "Q102260466"},
-    "Romance": {"Q1054574", "Q860626", "Q118612349"},
+    "History": {"Q17013749"},
+    "Horror": {"Q200092", "Q10663882", "Q224700", "Q853630", "Q102260466", "Q604725"},
+    "Romance": {"Q1054574", "Q860626", "Q118612349", "Q117536422"},
     "Sports": {"Q111278985"},
     "Thriller": {"Q2484376", "Q19367312", "Q3990883", "Q109733333"},
     "War": {"Q369747", "Q4774498"},
@@ -194,7 +196,7 @@ def main() -> None:
         if args.snapshot or args.format_reviews:
             parser.error("--from-database cannot be combined with import inputs")
     else:
-        snapshot = load_snapshots(args.snapshot or [EVIDENCE, EXPANSION])
+        snapshot = load_snapshots(args.snapshot or PILOT_BATCHES)
         reviews = json.loads((args.format_reviews or FORMAT_REVIEWS).read_text(encoding="utf-8"))
         pilot = audit(snapshot, reviews)
         rebuild_database(args.database, snapshot, pilot.records, pilot.report)

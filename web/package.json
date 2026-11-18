@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "node --disable-warning=ExperimentalWarning --experimental-strip-types --test tests/unit/*.test.ts",
+    "benchmark": "node scripts/benchmark.mjs",
     "test:e2e": "playwright test"
   },
   "dependencies": { "react": "19.2.7", "react-dom": "19.2.7" },

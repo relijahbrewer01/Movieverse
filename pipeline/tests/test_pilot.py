@@ -8,20 +8,21 @@ from pathlib import Path
 from pipeline.src.catalog import ROOT, encode, release
 from pipeline.src.catalog_db import open_catalog, rebuild_database
 from pipeline.src.pilot import DATASET, FORMAT_REVIEWS, REPORT, PilotProjection, audit
-from pipeline.src.wikidata import EVIDENCE, EXPANSION, load_snapshots
+from pipeline.src.wikidata import EVIDENCE, PILOT_BATCHES, load_snapshots
 
 
 class PilotTests(unittest.TestCase):
     def setUp(self):
-        self.snapshot = load_snapshots([EVIDENCE, EXPANSION])
+        self.snapshot = load_snapshots(PILOT_BATCHES)
         self.reviews = json.loads(FORMAT_REVIEWS.read_text(encoding="utf-8"))
         self.pilot = audit(self.snapshot, self.reviews)
 
     def test_checked_in_release_matches_pinned_snapshot(self):
-        self.assertEqual(self.pilot.report["candidates"], 137)
-        self.assertEqual(self.pilot.report["included"], 135)
+        self.assertEqual(self.pilot.report["candidates"], 260)
+        self.assertEqual(self.pilot.report["included"], 255)
         self.assertEqual(self.pilot.report["cohorts"]["snapshot"], {"included": 71, "held": 1})
         self.assertEqual(self.pilot.report["cohorts"]["expansion"], {"included": 64, "held": 1})
+        self.assertEqual(self.pilot.report["cohorts"]["coverage"], {"included": 120, "held": 3})
         self.assertEqual(len(self.pilot.records), len({film["id"] for film in self.pilot.records}))
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory)
@@ -46,6 +47,8 @@ class PilotTests(unittest.TestCase):
             for name in (manifest["catalog"], manifest["geometry"], "manifest.v1.json"):
                 self.assertEqual((output / name).read_text(encoding="utf-8"),
                                  (ROOT / "data/sample" / name).read_text(encoding="utf-8"))
+            points = json.loads((output / manifest["geometry"]).read_text(encoding="utf-8"))["points"]
+            self.assertTrue(all(abs(point["x"]) < 1.4 and abs(point["y"]) < 0.875 for point in points))
 
     def test_failed_import_does_not_replace_an_existing_database(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -63,8 +66,11 @@ class PilotTests(unittest.TestCase):
         solaris = [film for film in self.pilot.records if film["title"] == "Solaris"]
         self.assertEqual({film["year"] for film in solaris}, {1972, 2002})
         self.assertEqual({film["provenance"]["qid"] for film in solaris}, {"Q125772", "Q673195"})
-        self.assertEqual({row["qid"] for row in self.pilot.report["rows"] if row["outcome"] == "held"},
+        self.assertEqual({row["qid"] for row in self.pilot.report["rows"] if "outside-film-scope" in row["flags"]},
                          {"Q87131973", "Q244971"})
+        self.assertEqual({row["qid"] for row in self.pilot.report["rows"]
+                          if "expected-year-not-supported" in row["flags"]},
+                         {"Q112034047", "Q106632719", "Q448464"})
 
     def test_later_batch_cannot_silently_replace_pinned_qid_evidence(self):
         original = json.loads(EVIDENCE.read_text(encoding="utf-8"))

@@ -2,14 +2,14 @@
 
 ## Current release
 
-The expanded release has 135 films from 137 candidates across two pinned batches. The second batch added 64 films from 65 candidates and focuses on African, Middle Eastern, South and Southeast Asian, Latin American, Oceanian, and silent-era cinema. A TV series and a short film were held under the launch scope.
+The expanded release has 255 films from 260 candidates across three pinned batches. The second batch added 64 international and silent-era films. The third added 120 from 123 candidates, with more silent and early sound films, plus East Asian, African, Middle Eastern, European and Latin American cinema. The previous TV series and short film holds remain outside the launch scope.
 
 | Check | Current release |
 | --- | --- |
-| Country of origin | 59 distinct Wikidata country labels across 135 films. Co-productions match every country listed on the record. |
-| Release years | The oldest included display year is 1920. Eighty films have publication dates in more than one year. |
-| Browse coverage | 14 genre filters, 89 films with alternate titles, and 8 TV movies. |
-| New holds | A Trip to the Moon is classified by Wikidata as a short film. |
+| Country of origin | 66 distinct Wikidata country labels across 255 films. Co-productions match every country listed on the record. |
+| Release years | The oldest included display year is 1916. 146 films have publication dates in more than one year. |
+| Browse coverage | 16 mapped genre filters, 182 films with alternate titles, and 8 TV movies. Four records have no mapped genre. |
+| New holds | The selected year lacks supporting Wikidata evidence for The Blue Caftan, Faya Dayi, and Peppermint Candy. |
 
 These batches are curated for coverage and testing, so their proportions cannot estimate the wider catalog. The country filter follows the source's country-of-origin labels, which can include historical names.
 
@@ -46,6 +46,6 @@ On November 18, 2026, separate production and broadcast sources resolved the thr
 
 These three reviews resolve format. The 42 multi-year records remain flagged for publication context. We have not independently verified every territorial or reissue date.
 
-Inspect [candidate decisions](../data/wikidata-pilot/audit.json), [format reviews](../data/wikidata-pilot/format-reviews.json), [first-batch evidence](../data/wikidata-pilot/snapshot.json), [second-batch evidence](../data/wikidata-pilot/expansion.json), and [rebuild commands](../data/README.md).
+Inspect [candidate decisions](../data/wikidata-pilot/audit.json), [format reviews](../data/wikidata-pilot/format-reviews.json), [first-batch evidence](../data/wikidata-pilot/snapshot.json), [second-batch evidence](../data/wikidata-pilot/expansion.json), [third-batch evidence](../data/wikidata-pilot/coverage.json), and [rebuild commands](../data/README.md).
 
 Sources include [Wikidata data access](https://www.wikidata.org/wiki/Wikidata:Data_access), [licensing](https://www.wikidata.org/wiki/Wikidata:Licensing), [publication date (P577)](https://www.wikidata.org/wiki/Property:P577), and [Wikimedia API etiquette](https://www.mediawiki.org/wiki/API:Etiquette).

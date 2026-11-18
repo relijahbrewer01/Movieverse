@@ -1,6 +1,6 @@
 # Movieverse
 
-Movieverse is an interactive cinema atlas. The Wikidata pilot includes 135 films. Search by title, alternate title, or year, combine country, genre, and format filters, and select a film to see its metadata and source. The map shows editorial genre groups. See the [pilot audit](docs/WIKIDATA_PILOT.md) for coverage and limitations.
+Movieverse is an interactive cinema atlas. The Wikidata pilot includes 255 films. Search by title, alternate title, or year, combine country, genre, and format filters, and select a film to see its metadata and source. The map shows editorial genre groups. See the [pilot audit](docs/WIKIDATA_PILOT.md) for coverage and limitations.
 
 ## Open in VS Code
 
@@ -41,5 +41,7 @@ pnpm test:e2e
 ```
 
 Linux may require `pnpm exec playwright install --with-deps chromium`. Use `pnpm preview` for local inspection of the build in `web/dist`.
+
+Run `pnpm benchmark` after the build to measure desktop and throttled mobile browsing. See [performance notes](docs/PERFORMANCE.md) for the workload and how to interpret the results.
 
 See the [brief](MOVIEVERSE_CODEX_BRIEF.md), [product scope](docs/PRODUCT.md), [architecture](docs/ARCHITECTURE.md), [source review](docs/DATA_SOURCES.md), [data model](docs/DATA_MODEL.md), [projection](docs/SIMILARITY.md), and [decisions](docs/DECISIONS.md).
